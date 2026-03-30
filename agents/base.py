@@ -10,6 +10,13 @@ from openai import OpenAI
 
 from character_configs import CharacterConfig
 
+# If the model returns nothing twice, use a short in-character line (never show blank).
+_EMPTY_FALLBACK: dict[str, str] = {
+    "Zoe": "Sorry—that didn’t come through. What should I tackle first?",
+    "Femke": "My last message didn’t send—what do you want nailed down first, EU build or launch scope?",
+    "Hao": "Sorry, I think my message was blank—what did you want from me on this bit?",
+}
+
 
 class TeamMemberAgent:
     """One agent = one persona; generates replies with its own system prompt and API call."""
@@ -81,12 +88,21 @@ class TeamMemberAgent:
         )
         out: list[dict[str, str]] = [{"role": "system", "content": system}]
         for m in transcript[-CONTEXT_MESSAGES:]:
+            content = (m.get("text") or "").strip()
+            if not content:
+                continue
             role = "assistant" if m["speaker"] != "Participant" else "user"
             speaker = m["speaker"]
-            content = m["text"]
             out.append({"role": role, "name": speaker, "content": content})
         out.append({"role": "user", "content": self._turn_instruction(transcript)})
         return out
+
+    @staticmethod
+    def _strip_speaker_prefix(name: str, text: str) -> str:
+        tag = f"{name}:"
+        if text.startswith(tag):
+            return text.split(":", 1)[1].strip()
+        return text
 
     def generate_reply(
         self,
@@ -96,21 +112,40 @@ class TeamMemberAgent:
         leadership_style: str,
         scenario_content: str,
         behavioral_content: str,
-    ) -> str:
-        messages = self.build_openai_messages(
+    ) -> tuple[str, int]:
+        messages: list[dict[str, str]] = self.build_openai_messages(
             transcript,
             leadership_style,
             scenario_content,
             behavioral_content,
         )
-        completion = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            max_completion_tokens=self._config.max_completion_tokens,
-            reasoning_effort="low",
+        api_calls = 0
+        for attempt in range(2):
+            completion = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_completion_tokens=self._config.max_completion_tokens,
+                reasoning_effort="low",
+            )
+            api_calls += 1
+            raw = completion.choices[0].message.content
+            txt = (raw or "").strip()
+            txt = self._strip_speaker_prefix(self.name, txt)
+            if txt:
+                return txt, api_calls
+            if attempt == 0:
+                messages = messages + [
+                    {
+                        "role": "user",
+                        "content": (
+                            "Your reply was empty or whitespace only. "
+                            "Send one non-empty chat line, in character, with real words."
+                        ),
+                    }
+                ]
+
+        fb = _EMPTY_FALLBACK.get(
+            self.name,
+            "Sorry—message didn’t go through. What should I pick up on?",
         )
-        txt = completion.choices[0].message.content.strip()
-        tag = f"{self.name}:"
-        if txt.startswith(tag):
-            txt = txt.split(":", 1)[1].strip()
-        return txt
+        return fb, api_calls

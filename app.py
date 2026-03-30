@@ -112,8 +112,8 @@ leadership_style = st.sidebar.select_slider(
 
 with st.sidebar.expander("🎛️ Character pacing (live)", expanded=True):
     st.caption(
-        "Weights: relative chance each teammate speaks when nobody is @mentioned. "
-        "@mentions still route the next reply."
+        "Weights: baseline chance each teammate speaks. "
+        "If someone directly asks a teammate (e.g. @name or 'Hao?'), that teammate answers next."
     )
     for _n in AI_NAMES:
         st.slider(
@@ -162,7 +162,7 @@ def run_agent_turn(speaker: str):
     agent = get_agent(speaker)
     cfg = agent.config
     try:
-        txt = agent.generate_reply(
+        txt, n_api = agent.generate_reply(
             client,
             MODEL_NAME,
             st.session_state.messages,
@@ -173,7 +173,7 @@ def run_agent_turn(speaker: str):
         st.session_state.messages.append({
             "speaker": speaker, "text": txt, "timestamp": datetime.now().strftime("%H:%M:%S")
         })
-        st.session_state.api_count += 1
+        st.session_state.api_count += n_api
     except Exception as e:
         st.error(f"AI Error ({speaker}): {e}")
     return cfg
@@ -207,7 +207,9 @@ def chat_ui():
 
         weight_map = {n: float(st.session_state[f"tune_w_{n}"]) for n in AI_NAMES}
         speaker, cfg = pick_next_speaker(
-            last_speaker, last_text, weights_override=weight_map
+            last_speaker,
+            last_text,
+            weights_override=weight_map,
         )
 
         td_raw = st.session_state.get(

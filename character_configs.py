@@ -5,6 +5,7 @@ mention patterns for routing, and generation limits.
 from __future__ import annotations
 
 import random
+import re
 from dataclasses import dataclass
 from typing import Callable
 
@@ -130,44 +131,50 @@ def parse_typing_delay(text: str, fallback: tuple[float, float]) -> tuple[float,
         return fallback
 
 
-def detect_mentioned_respondent(author: str, text: str) -> str | None:
+def detect_directly_asked_respondent(author: str, text: str) -> str | None:
     """
-    If `text` addresses another AI by name/@handle, return who should reply next.
-    First occurrence in the message wins. Author cannot route to themselves.
+    Return a teammate name only when the last message *directly asks* them.
+    Examples:
+    - '@hao ...'
+    - 'Hao, what do you think?'
+    - 'Can you share, Femke?'
+    Mentioning a name in passing should not force a turn.
     """
     if not text or not text.strip():
         return None
+
     lower = text.lower()
-    hits: list[tuple[int, str]] = []
+    has_question = "?" in lower
     for name in AI_NAMES:
         if name == author:
             continue
-        cfg = CHARACTERS[name]
-        earliest = None
-        for pat in cfg.mention_patterns:
-            pos = lower.find(pat)
-            if pos >= 0 and (earliest is None or pos < earliest):
-                earliest = pos
-        if earliest is not None:
-            hits.append((earliest, name))
-    if not hits:
-        return None
-    hits.sort(key=lambda x: x[0])
-    return hits[0][1]
+        n = name.lower()
+        # Explicit @mention counts as direct ask.
+        if f"@{n}" in lower:
+            return name
+        # Name + question context (start / punctuation / question sentence)
+        if has_question:
+            if re.search(rf"\b{re.escape(n)}\b", lower):
+                return name
+    return None
 
 
 def pick_next_speaker(
     last_speaker: str,
     last_text: str,
     weights_override: dict[str, float] | None = None,
+    recent_messages: list[dict] | None = None,
 ) -> tuple[str, CharacterConfig]:
     """
-    Choose who speaks next: explicit mention of another AI, else weighted random.
-    weights_override: per-name weights from UI (relative; need not sum to 1).
+    Default: weighted random by speak weights.
+    Exception: if someone is directly asked (@name or name in a question),
+    route the next turn to that teammate.
     """
-    mentioned = detect_mentioned_respondent(last_speaker, last_text)
-    if mentioned and mentioned in CHARACTERS:
-        return mentioned, CHARACTERS[mentioned]
+    _ = recent_messages
+    direct_target = detect_directly_asked_respondent(last_speaker, last_text)
+    if direct_target and direct_target in CHARACTERS:
+        return direct_target, CHARACTERS[direct_target]
+
     names = list(CHARACTERS.keys())
     if weights_override is None:
         wts = [CHARACTERS[n].default_weight for n in names]
@@ -176,5 +183,6 @@ def pick_next_speaker(
             max(0.01, float(weights_override.get(n, CHARACTERS[n].default_weight)))
             for n in names
         ]
+
     choice = random.choices(names, weights=wts, k=1)[0]
     return choice, CHARACTERS[choice]
