@@ -49,6 +49,8 @@ FRAGMENT_REFRESH_SEC = 1.2
 START_WARMUP_SEC = 0.8
 HUMAN_REPLY_DELAY_RANGE = (1.5, 3.2)
 IDLE_AFTER_BURST_RANGE = (5.0, 9.0)
+# Scroll this area only; keeps the participant chat box from being pushed off-screen.
+CHAT_SCROLL_HEIGHT_PX = 560
 
 # ==========================================
 # 2. DATA LOADING FUNCTIONS
@@ -135,13 +137,21 @@ with st.sidebar.expander("📝 Edit Scenario / Rules", expanded=False):
     behavioral_content = st.text_area("Behavioral Rules", value=initial_behavioral, height=150)
 
 st.sidebar.divider()
-col1, col2 = st.sidebar.columns(2)
-if col1.button("▶ START SIM"):
+st.sidebar.caption(
+    "**STOP** pauses AI only (keeps chat; no API). **RESET** clears chat and counters."
+)
+col_run, col_stop, col_reset = st.sidebar.columns(3)
+if col_run.button("▶ START"):
     st.session_state.sim_active = True
     st.session_state.next_ai_time = time.time() + START_WARMUP_SEC
     st.session_state.ai_burst_remaining = random.randint(2, 3)
     st.rerun()
-if col2.button("⏹ RESET"):
+if col_stop.button("⏸ STOP"):
+    st.session_state.sim_active = False
+    st.session_state.next_ai_time = 0.0
+    st.session_state.ai_burst_remaining = 0
+    st.rerun()
+if col_reset.button("⏹ RESET"):
     st.session_state.sim_active = False
     st.session_state.messages = []
     st.session_state.next_ai_time = 0.0
@@ -182,20 +192,49 @@ def run_agent_turn(speaker: str):
 # ==========================================
 # 6. MAIN UI - INFO BAR
 # ==========================================
-st.info(f"Condition: **{leadership_style}** | Participant: **{participant_id}**")
+_sim_status = "**Running**" if st.session_state.sim_active else "**Stopped** (AI off; transcript kept)"
+st.info(
+    f"Condition: **{leadership_style}** | Participant: **{participant_id}** | Sim: {_sim_status}"
+)
+
+st.markdown(
+    """
+<style>
+/* Keep the participant chat field visible: stick to viewport bottom + backdrop */
+div[data-testid="stChatInputContainer"] {
+    position: sticky;
+    bottom: 0;
+    z-index: 999;
+    padding-top: 0.5rem;
+    margin-top: 0.25rem;
+    background: var(--background-color, #ffffff);
+}
+@media (prefers-color-scheme: dark) {
+    div[data-testid="stChatInputContainer"] {
+        background: var(--background-color, #0e1117);
+    }
+}
+</style>
+""",
+    unsafe_allow_html=True,
+)
 
 # ==========================================
 # 7. ASYNC CHAT UI
 # ==========================================
 @st.fragment(run_every=FRAGMENT_REFRESH_SEC)
-def chat_ui():
-    for m in st.session_state.messages:
-        with st.chat_message(m["speaker"]):
-            st.write(f"**{m['speaker']}**:")
-            st.text(m['text'])
+def chat_messages_panel():
+    with st.container(height=CHAT_SCROLL_HEIGHT_PX, border=False):
+        for m in st.session_state.messages:
+            with st.chat_message(m["speaker"]):
+                st.write(f"**{m['speaker']}**:")
+                st.text(m['text'])
+        if not st.session_state.sim_active and not st.session_state.messages:
+            st.caption("Simulation not started. Use ▶ START in the sidebar.")
+        elif not st.session_state.sim_active and st.session_state.messages:
+            st.caption("Simulation **stopped** — transcript below. Click ▶ START to resume AI.")
 
     if not st.session_state.sim_active:
-        st.caption("Simulation not started. Use ▶ START SIM in the sidebar.")
         return
 
     now = time.time()
@@ -234,16 +273,17 @@ def chat_ui():
             st.session_state.next_ai_time = time.time() + random.uniform(*IDLE_AFTER_BURST_RANGE)
             st.session_state.ai_burst_remaining = random.randint(1, 3)
 
-    if prompt := st.chat_input("Join the conversation... (type any time)"):
-        st.session_state.messages.append({
-            "speaker": "Participant",
-            "text": prompt,
-            "timestamp": datetime.now().strftime("%H:%M:%S")
-        })
-        st.session_state.next_ai_time = time.time() + random.uniform(*HUMAN_REPLY_DELAY_RANGE)
-        # Keep it snappy but avoid 2 AI messages firing immediately after the human;
-        # that often causes repeated/incomplete re-introductions.
-        st.session_state.ai_burst_remaining = 1
-        st.rerun()
 
-chat_ui()
+chat_messages_panel()
+
+if prompt := st.chat_input("Join the conversation... (type any time)"):
+    st.session_state.messages.append({
+        "speaker": "Participant",
+        "text": prompt,
+        "timestamp": datetime.now().strftime("%H:%M:%S")
+    })
+    # Only schedule AI replies while simulation is running (STOP / no START = no API use).
+    if st.session_state.sim_active:
+        st.session_state.next_ai_time = time.time() + random.uniform(*HUMAN_REPLY_DELAY_RANGE)
+        st.session_state.ai_burst_remaining = 1
+    st.rerun()
