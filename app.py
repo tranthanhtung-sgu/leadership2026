@@ -113,7 +113,8 @@ leadership_style = st.sidebar.select_slider(
 with st.sidebar.expander("🎛️ Character pacing (live)", expanded=True):
     st.caption(
         "Weights: baseline chance each teammate speaks. "
-        "If someone directly asks a teammate (e.g. @name or 'Hao?'), that teammate answers next."
+        "If one or more teammates are directly asked (@name, 'Name, …', or name before ?), "
+        "one respondent is picked using these weights; low weight = less often 'takes' a solo ask."
     )
     for _n in AI_NAMES:
         st.slider(
@@ -210,6 +211,7 @@ def chat_ui():
             last_speaker,
             last_text,
             weights_override=weight_map,
+            recent_messages=st.session_state.messages,
         )
 
         td_raw = st.session_state.get(

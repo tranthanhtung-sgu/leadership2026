@@ -52,7 +52,8 @@ Output rules:
 - Real chat rhythm is OK: quick reactions, humour (in character), clarifying questions, mild pushback — not every line must jump straight to funding pitch or the three VC questions.
 - Do not repeat yourself or previous messages verbatim.
 - If you already said similar facts recently, add a different angle (e.g., manufacturing vs distribution vs leadership).
-- Avoid saying someone else's identity (e.g., do not claim to be another teammate)."""
+- Avoid saying someone else's identity (e.g., do not claim to be another teammate).
+- In one chat line, prefer directing a question or request to one teammate at a time (avoid stacking multiple @names / “Zoe … and Hao …” in the same message)."""
 
 
 def _zoe_identity(leadership_style: str) -> str:
@@ -131,32 +132,50 @@ def parse_typing_delay(text: str, fallback: tuple[float, float]) -> tuple[float,
         return fallback
 
 
-def detect_directly_asked_respondent(author: str, text: str) -> str | None:
+def collect_direct_ask_candidates(author: str, text: str) -> list[str]:
     """
-    Return a teammate name only when the last message *directly asks* them.
-    Examples:
-    - '@hao ...'
-    - 'Hao, what do you think?'
-    - 'Can you share, Femke?'
-    Mentioning a name in passing should not force a turn.
+    Teammates who are directly addressed in this line (may be multiple).
+    - @name
+    - Name, ...  (e.g. "Hao, send me ...", "Zoe, if R&D ...")
+    - name appears in the same sentence fragment before a '?'
     """
     if not text or not text.strip():
-        return None
+        return []
 
     lower = text.lower()
-    has_question = "?" in lower
+    found: list[str] = []
+    seen: set[str] = set()
+
     for name in AI_NAMES:
         if name == author:
             continue
         n = name.lower()
-        # Explicit @mention counts as direct ask.
         if f"@{n}" in lower:
-            return name
-        # Name + question context (start / punctuation / question sentence)
-        if has_question:
-            if re.search(rf"\b{re.escape(n)}\b", lower):
-                return name
-    return None
+            if name not in seen:
+                found.append(name)
+                seen.add(name)
+
+    for name in AI_NAMES:
+        if name == author or name in seen:
+            continue
+        n = name.lower()
+        if re.search(rf"(^|[.!?\n]\s*){re.escape(n)}\s*,", lower):
+            found.append(name)
+            seen.add(name)
+
+    if "?" in text:
+        # Only the part(s) before a '?' count as question context (not text after the last ?).
+        for part in re.split(r"\?", text)[:-1]:
+            pl = part.lower()
+            for name in AI_NAMES:
+                if name == author or name in seen:
+                    continue
+                n = name.lower()
+                if re.search(rf"\b{re.escape(n)}\b", pl):
+                    found.append(name)
+                    seen.add(name)
+
+    return found
 
 
 def pick_next_speaker(
@@ -167,22 +186,44 @@ def pick_next_speaker(
 ) -> tuple[str, CharacterConfig]:
     """
     Default: weighted random by speak weights.
-    Exception: if someone is directly asked (@name or name in a question),
-    route the next turn to that teammate.
+
+    If the last message directly addresses teammate(s), pick next speaker using
+    those candidates weighted by speak weight (one person when several are named).
+    If only one person is addressed but their speak weight is low, sometimes skip
+    the "forced" reply and fall back to normal weighted random so they are not
+    over-talking.
+
+    Zoe opens the thread: until any AI teammate has posted, the next AI line is Zoe.
     """
-    _ = recent_messages
-    direct_target = detect_directly_asked_respondent(last_speaker, last_text)
-    if direct_target and direct_target in CHARACTERS:
-        return direct_target, CHARACTERS[direct_target]
+    if recent_messages is not None:
+        if not any(m.get("speaker") in AI_NAMES for m in recent_messages):
+            return "Zoe", CHARACTERS["Zoe"]
 
     names = list(CHARACTERS.keys())
     if weights_override is None:
-        wts = [CHARACTERS[n].default_weight for n in names]
+        w = {n: float(CHARACTERS[n].default_weight) for n in names}
     else:
-        wts = [
-            max(0.01, float(weights_override.get(n, CHARACTERS[n].default_weight)))
+        w = {
+            n: max(0.01, float(weights_override.get(n, CHARACTERS[n].default_weight)))
             for n in names
-        ]
+        }
+    wts = [w[n] for n in names]
+    max_w = max(w.values()) if w else 1.0
+
+    candidates = collect_direct_ask_candidates(last_speaker, last_text)
+    candidates = [c for c in candidates if c in CHARACTERS]
+
+    if len(candidates) >= 2:
+        cw = [w[c] for c in candidates]
+        choice = random.choices(candidates, weights=cw, k=1)[0]
+        return choice, CHARACTERS[choice]
+
+    if len(candidates) == 1:
+        c = candidates[0]
+        # Higher speak weight → more likely to "take" the direct ask; low weight → often skip
+        p_honor = 0.2 + 0.8 * (w[c] / max_w if max_w > 0 else 1.0)
+        if random.random() < p_honor:
+            return c, CHARACTERS[c]
 
     choice = random.choices(names, weights=wts, k=1)[0]
     return choice, CHARACTERS[choice]
