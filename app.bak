@@ -1,0 +1,219 @@
+import streamlit as st
+import google.generativeai as genai
+import time
+import random
+import os
+import pandas as pd
+from datetime import datetime
+
+# ==========================================
+# 0. PASSWORD PROTECTION
+# ==========================================
+
+# Simple Password Protection
+def check_password():
+    if "password_correct" not in st.session_state:
+        st.session_state.password_correct = False
+
+    if not st.session_state.password_correct:
+        pw = st.text_input("Enter Access Code", type="password")
+        if pw == "sonny@curtin": # Set your password here
+            st.session_state.password_correct = True
+            st.rerun()
+        else:
+            if pw: st.error("Wrong password")
+            st.stop()
+
+check_password()
+
+
+# ==========================================
+# 1. INITIAL SETUP & API
+# ==========================================
+st.set_page_config(page_title="Leadership Study v2", layout="wide")
+
+# Ensure API Key is available
+if "GEMINI_KEY" not in st.secrets:
+    st.error("Please add GEMINI_KEY to your Streamlit Secrets.")
+    st.stop()
+
+genai.configure(api_key=st.secrets["GEMINI_KEY"])
+model = genai.GenerativeModel('models/gemini-2.0-flash')
+
+
+# ==========================================
+# 2. DATA LOADING FUNCTIONS
+# ==========================================
+def load_text_file(filename, default_text):
+    if os.path.exists(filename):
+        with open(filename, "r", encoding="utf-8") as f:
+            return f.read()
+    return default_text
+
+# Load initial content
+initial_scenario = load_text_file("scenario.txt", "Scenario: Team meeting about CortiSense.")
+initial_behavioral = load_text_file("behavioral_requirements.txt", "Rules: Act like humans, use typos.")
+
+# ==========================================
+# 3. SIDEBAR CONTROLS
+# ==========================================
+st.sidebar.title("🔬 Research Controller")
+
+# --- DEBUG TOOL: Place it right here ---
+with st.sidebar.expander("🛠️ API Diagnostic Tool", expanded=False):
+    if st.button("List Available Models"):
+        try:
+            # This calls the API to see what Google is actually allowing
+            available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+            st.write("Your key has access to:")
+            st.code("\n".join(available_models))
+        except Exception as e:
+            st.error(f"Could not list models: {e}")
+# ---------------------------------------
+
+
+# Participant ID for data tracking
+participant_id = st.sidebar.text_input("Participant ID", value="P-001")
+
+# Leadership Style Toggle
+leadership_style = st.sidebar.select_slider(
+    "Zoe's Leadership Style",
+    options=["Non-Inclusive", "Inclusive"],
+    help="Determines Zoe's behavior toward Hao and the Participant."
+)
+
+# Text areas to allow live-tweaking of the loaded files
+with st.sidebar.expander("📝 Edit Scenario / Rules", expanded=False):
+    scenario_content = st.text_area("Scenario Context", value=initial_scenario, height=150)
+    behavioral_content = st.text_area("Behavioral Rules", value=initial_behavioral, height=150)
+
+st.sidebar.divider()
+
+# ==========================================
+# 4. SESSION STATE MANAGEMENT
+# ==========================================
+# We use 'sim_active' because that is what the simulation_engine looks for.
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+if "last_ai_turn_time" not in st.session_state:
+    st.session_state.last_ai_turn_time = time.time()
+
+if "sim_active" not in st.session_state:
+    st.session_state.sim_active = False
+
+# ==========================================
+# 5. PROMPT ORCHESTRATOR
+# ==========================================
+def build_agent_prompt(name):
+    # Core Persona Definitions
+    identities = {
+        "Zoe": f"You are Zoe, the team lead. Current Style: {leadership_style}.",
+        "Femke": "You are Femke, a dominant Dutch teammate. Blunt, low power distance, interrupts often.",
+        "Hao": "You are Hao, a hesitant East Asian teammate. High power distance, uses ^^ and 'ah'."
+    }
+    
+    # Combine all logic layers
+    full_prompt = f"""
+    {identities[name]}
+    
+    TASK CONTEXT:
+    {scenario_content}
+    
+    BEHAVIORAL REQUIREMENTS (How to act):
+    {behavioral_content}
+    
+    SPECIFIC RULES:
+    - You are in a group chat. Reference others as @Name.
+    - Be proactive. If nobody is talking, start a new related thought.
+    - Use human-like typing: occasional lowercase, typos, or 'chat-speak'.
+    """
+    return full_prompt
+
+# ==========================================
+# 6. ASYNCHRONOUS SIMULATION ENGINE
+# ==========================================
+@st.fragment(run_every=6) # Checks for AI turns every 6 seconds
+def simulation_engine():
+    # Only run if the START button has been pressed
+    if st.session_state.get("sim_active", False):
+        current_time = time.time()
+        
+        # Determine the delay (e.g., 10 seconds)
+        delay = 10 
+        
+        # Check if enough time has passed since the last message
+        if current_time - st.session_state.last_ai_turn_time > delay:
+            # 1. Pick a speaker
+            speaker = random.choices(["Zoe", "Femke", "Hao"], weights=[0.3, 0.45, 0.25])[0]
+            
+            # 2. Build Context
+            history = "\n".join([f"{m['speaker']}: {m['text']}" for m in st.session_state.messages[-10:]])
+            sys_prompt = build_agent_prompt(speaker)
+            
+            try:
+                # 3. Generate AI Response
+                response = model.generate_content(f"{sys_prompt}\n\nChat History:\n{history}\n\n{speaker}:").text
+                
+                # 4. APPEND FIRST, then update timer
+                st.session_state.messages.append({
+                    "speaker": speaker,
+                    "text": response.strip(),
+                    "style": leadership_style,
+                    "timestamp": datetime.now().strftime("%H:%M:%S")
+                })
+                
+                # 5. Reset the timer so it doesn't trigger again immediately
+                st.session_state.last_ai_turn_time = time.time()
+                
+                # 6. ONLY NOW RERUN
+                st.rerun(scope="app") 
+            except Exception as e:
+                st.error(f"AI Error: {e}")
+
+# ==========================================
+# 7. UI AND INTERACTION
+# ==========================================
+# Control Buttons
+col1, col2 = st.sidebar.columns(2)
+if col1.button("▶ START SIM"): st.session_state.sim_active = True
+if col2.button("⏹ PAUSE"): st.session_state.sim_active = False
+
+# Export Feature
+if st.sidebar.button("💾 EXPORT TRANSCRIPT"):
+    if st.session_state.messages:
+        df = pd.DataFrame(st.session_state.messages)
+        df['participant_id'] = participant_id
+        csv = df.to_csv(index=False).encode('utf-8')
+        st.sidebar.download_button(
+            label="Download CSV",
+            data=csv,
+            file_name=f"study_{participant_id}_{datetime.now().strftime('%Y%m%d')}.csv",
+            mime="text/csv"
+        )
+
+# 1. RUN THE ENGINE FIRST (Move this up!)
+simulation_engine()
+
+# 2. Status Info
+st.info(f"Condition: **{leadership_style}** | Participant: **{participant_id}**")
+
+# 3. DISPLAY LOOP
+# We put this in a container so it stays stable
+chat_placeholder = st.container()
+with chat_placeholder:
+    for m in st.session_state.messages:
+        with st.chat_message(m["speaker"]):
+            # Formatting timestamp and text clearly
+            st.markdown(f"**{m['speaker']}** [{m.get('timestamp', '')}]: {m['text']}")
+
+# 4. HUMAN INPUT (Always at the bottom)
+if prompt := st.chat_input("Enter your message to the group..."):
+    st.session_state.messages.append({
+        "speaker": "Participant",
+        "text": prompt,
+        "style": leadership_style,
+        "timestamp": datetime.now().strftime("%H:%M:%S")
+    })
+    st.session_state.last_ai_turn_time = time.time()
+    st.rerun()
