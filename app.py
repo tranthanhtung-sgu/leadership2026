@@ -3,6 +3,7 @@ from openai import OpenAI
 import time
 import random
 import os
+import io
 import pandas as pd
 from datetime import datetime
 
@@ -162,9 +163,21 @@ if col_reset.button("⏹ RESET"):
 if st.sidebar.button("💾 EXPORT TRANSCRIPT"):
     if st.session_state.messages:
         df = pd.DataFrame(st.session_state.messages)
-        df['participant_id'] = participant_id
-        csv = df.to_csv(index=False).encode('utf-8')
-        st.sidebar.download_button(label="Download CSV", data=csv, file_name=f"study_{participant_id}.csv", mime="text/csv")
+        df["participant_id"] = participant_id
+        # Clear column order for reviewers; Excel needs UTF-8 BOM or it mangles curly quotes (â€™).
+        _preferred = ["participant_id", "speaker", "text", "timestamp"]
+        _cols = [c for c in _preferred if c in df.columns]
+        _cols += [c for c in df.columns if c not in _cols]
+        df = df[_cols]
+        _buf = io.BytesIO()
+        df.to_csv(_buf, index=False, encoding="utf-8-sig", lineterminator="\n")
+        csv = _buf.getvalue()
+        st.sidebar.download_button(
+            label="Download CSV",
+            data=csv,
+            file_name=f"study_{participant_id}.csv",
+            mime="text/csv; charset=utf-8",
+        )
 
 # ==========================================
 # 5. AI ENGINE (three distinct agents; one API call per turn)
