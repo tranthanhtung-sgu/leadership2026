@@ -15,8 +15,17 @@ from character_configs import (
     format_typing_delay,
     parse_typing_delay,
     pick_next_speaker,
-    plan_contribution_nudge,
 )
+
+try:
+    from character_configs import plan_contribution_nudge
+except ImportError:  # deploy may have older character_configs without this helper
+
+    def plan_contribution_nudge(*args, **kwargs):
+        """No-op: quiet-teammate draw-ins disabled until character_configs is updated."""
+        return None
+
+
 from agents import get_agent
 
 # ==========================================
