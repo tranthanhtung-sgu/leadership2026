@@ -71,7 +71,8 @@ MODEL_NAME = "gpt-5.2"
 FRAGMENT_REFRESH_SEC = 1.2
 START_WARMUP_SEC = 0.8
 # Longer pause after the human sends so they can read before bots pile on
-HUMAN_REPLY_DELAY_RANGE = (7.0, 16.0)
+# Keep this small so bots continue quickly after a human sends.
+HUMAN_REPLY_DELAY_RANGE = (3, 6)
 IDLE_AFTER_BURST_RANGE = (5.0, 9.0)
 # Extra idle after a burst if the Participant spoke recently (reading / jump-in window)
 PARTICIPANT_RECENT_IDLE_RANGE = (16.0, 32.0)
@@ -409,33 +410,67 @@ body {{ background: #efeae2; }}
   const SCROLL_THRESHOLD = 8;
   const feed = document.querySelector('.tc-feed');
   const fabWrap = document.querySelector('.tc-scroll-fab-wrap');
+  const SK = 'tc_feed_scrolltop_v1';
+  const PK = 'tc_feed_pinned_v1';
   function toBottom() {{
     if (!feed) return;
     feed.scrollTop = feed.scrollHeight;
   }}
+  function gapToBottom() {{
+    if (!feed) return 0;
+    return feed.scrollHeight - feed.clientHeight - feed.scrollTop;
+  }}
+  function isPinned() {{
+    return gapToBottom() <= SCROLL_THRESHOLD;
+  }}
+  function setPinned(v) {{
+    try {{ sessionStorage.setItem(PK, v ? '1' : '0'); }} catch (e) {{}}
+  }}
+  function getPinned() {{
+    try {{ return sessionStorage.getItem(PK) === '1'; }} catch (e) {{ return true; }}
+  }}
   function isScrolledUp() {{
     if (!feed) return false;
-    var gap = feed.scrollHeight - feed.clientHeight - feed.scrollTop;
-    return gap > SCROLL_THRESHOLD;
+    return gapToBottom() > SCROLL_THRESHOLD;
   }}
   function updateFabVisibility() {{
     if (!fabWrap) return;
     fabWrap.style.display = isScrolledUp() ? 'flex' : 'none';
     fabWrap.setAttribute('aria-hidden', isScrolledUp() ? 'false' : 'true');
   }}
-  const SK = 'tc_feed_scrolltop_v1';
   if (feed) {{
     let saved = null;
     try {{ saved = sessionStorage.getItem(SK); }} catch (e) {{}}
-    if (saved !== null && saved !== '') {{
+    // Restore scroll position unless we were previously pinned to bottom.
+    if (getPinned()) {{
+      toBottom();
+    }} else if (saved !== null && saved !== '') {{
       feed.scrollTop = parseInt(saved, 10) || 0;
     }} else {{
       toBottom();
     }}
+    // After layout settles, if we're pinned keep at bottom (new messages arriving).
+    requestAnimationFrame(function () {{
+      if (getPinned()) toBottom();
+      updateFabVisibility();
+    }});
     feed.addEventListener('scroll', function () {{
       try {{ sessionStorage.setItem(SK, String(feed.scrollTop)); }} catch (e) {{}}
+      setPinned(isPinned());
       updateFabVisibility();
     }}, {{ passive: true }});
+    // Auto-follow new messages only when pinned to bottom.
+    if (typeof MutationObserver !== 'undefined') {{
+      try {{
+        var mo = new MutationObserver(function () {{
+          if (getPinned()) {{
+            toBottom();
+          }}
+          updateFabVisibility();
+        }});
+        mo.observe(feed, {{ childList: true, subtree: true }});
+      }} catch (e) {{}}
+    }}
     if (typeof ResizeObserver !== 'undefined') {{
       try {{
         var ro = new ResizeObserver(function () {{ updateFabVisibility(); }});
@@ -488,6 +523,10 @@ if "bot_turns_since_human" not in st.session_state:
     st.session_state.bot_turns_since_human = 0
 if "last_contribution_nudge_at_ai_count" not in st.session_state:
     st.session_state.last_contribution_nudge_at_ai_count = -10_000
+if "pending_bot_turn" not in st.session_state:
+    # Non-blocking typing simulation. When set, the UI can accept Participant input
+    # while a bot is "thinking/typing", avoiding reordering caused by time.sleep.
+    st.session_state.pending_bot_turn = None
 
 for _name in AI_NAMES:
     _wk = f"tune_w_{_name}"
@@ -698,6 +737,8 @@ def chat_messages_panel():
             "timestamp": datetime.now().strftime("%H:%M:%S"),
         })
         st.session_state.bot_turns_since_human = 0
+        # If a bot was mid "typing", cancel it so the next bot reply can react to the new human line.
+        st.session_state.pending_bot_turn = None
         if st.session_state.sim_active:
             st.session_state.next_ai_time = time.time() + random.uniform(*HUMAN_REPLY_DELAY_RANGE)
             # Let several bots respond in quick succession so the human isn’t dropped after one reply
@@ -708,6 +749,54 @@ def chat_messages_panel():
         return
 
     now = time.time()
+    # If a bot is currently "typing", show the indicator and only post when its ready_at is reached.
+    pending = st.session_state.get("pending_bot_turn")
+    if pending is not None:
+        try:
+            ready_at = float(pending.get("ready_at", 0.0))
+        except Exception:
+            ready_at = 0.0
+        speaker = str(pending.get("speaker") or "")
+        extra_instruction = pending.get("extra_instruction")
+        used_contribution_nudge = bool(pending.get("used_contribution_nudge", False))
+
+        if speaker:
+            st.caption(f"{speaker} is typing…")
+
+        if now < ready_at:
+            return
+
+        ok = run_agent_turn(speaker, extra_instruction=extra_instruction)
+        st.session_state.pending_bot_turn = None
+        if not ok:
+            st.session_state.next_ai_time = time.time() + 4.0
+            return
+
+        if used_contribution_nudge:
+            st.session_state.last_contribution_nudge_at_ai_count = sum(
+                1 for m in st.session_state.messages if m.get("speaker") in AI_NAMES
+            )
+
+        cfg = CHARACTERS[speaker]
+        st.session_state.bot_turns_since_human += 1
+
+        g0, g1 = cfg.burst_gap
+        gap_after = random.uniform(g0, g1)
+
+        if st.session_state.ai_burst_remaining > 0:
+            st.session_state.next_ai_time = time.time() + gap_after
+            st.session_state.ai_burst_remaining -= 1
+        else:
+            tail = st.session_state.messages[-6:]
+            if any(m.get("speaker") == "Participant" for m in tail):
+                idle_lo, idle_hi = PARTICIPANT_RECENT_IDLE_RANGE
+            else:
+                idle_lo, idle_hi = IDLE_AFTER_BURST_RANGE
+            st.session_state.next_ai_time = time.time() + random.uniform(idle_lo, idle_hi)
+            st.session_state.ai_burst_remaining = random.randint(1, 3)
+
+        st.rerun()
+
     if now >= st.session_state.next_ai_time:
         if not st.session_state.messages:
             last_speaker, last_text = "Participant", ""
@@ -763,50 +852,31 @@ def chat_messages_panel():
                     recent_messages=st.session_state.messages,
                 )
 
+        # Schedule a non-blocking "typing" period; the actual API call happens later.
         _think_fallback = _cfg_think_delay(cfg)
         think_raw = st.session_state.get(
             f"tune_think_{speaker}",
             format_typing_delay(_think_fallback),
         )
         t_lo, t_hi = parse_typing_delay(str(think_raw), _think_fallback)
-        time.sleep(random.uniform(t_lo, t_hi))
+        think_sec = random.uniform(t_lo, t_hi)
 
         td_raw = st.session_state.get(
             f"tune_td_{speaker}",
             format_typing_delay(cfg.typing_delay),
         )
         lo, hi = parse_typing_delay(str(td_raw), cfg.typing_delay)
+        type_sec = random.uniform(lo, hi)
 
-        with st.spinner(f"{speaker} is typing..."):
-            time.sleep(random.uniform(lo, hi))
-            ok = run_agent_turn(speaker, extra_instruction=extra_instruction)
-
-        if not ok:
-            st.session_state.next_ai_time = time.time() + 4.0
-            return
-
-        if used_contribution_nudge:
-            st.session_state.last_contribution_nudge_at_ai_count = sum(
-                1 for m in st.session_state.messages if m.get("speaker") in AI_NAMES
-            )
-
-        cfg = CHARACTERS[speaker]
-        st.session_state.bot_turns_since_human += 1
-
-        g0, g1 = cfg.burst_gap
-        gap_after = random.uniform(g0, g1)
-
-        if st.session_state.ai_burst_remaining > 0:
-            st.session_state.next_ai_time = time.time() + gap_after
-            st.session_state.ai_burst_remaining -= 1
-        else:
-            tail = st.session_state.messages[-6:]
-            if any(m.get("speaker") == "Participant" for m in tail):
-                idle_lo, idle_hi = PARTICIPANT_RECENT_IDLE_RANGE
-            else:
-                idle_lo, idle_hi = IDLE_AFTER_BURST_RANGE
-            st.session_state.next_ai_time = time.time() + random.uniform(idle_lo, idle_hi)
-            st.session_state.ai_burst_remaining = random.randint(1, 3)
+        st.session_state.pending_bot_turn = {
+            "speaker": speaker,
+            "extra_instruction": extra_instruction,
+            "used_contribution_nudge": used_contribution_nudge,
+            "ready_at": time.time() + think_sec + type_sec,
+        }
+        # Keep fragment alive; next run will post when ready_at has passed.
+        st.session_state.next_ai_time = time.time() + 0.05
+        st.rerun()
 
 
 chat_messages_panel()
