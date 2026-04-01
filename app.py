@@ -387,6 +387,8 @@ def _team_chat_iframe_doc(
     messages: list[dict],
     participant_label: str,
     feed_max_px: int,
+    *,
+    force_scroll_to_bottom: bool = False,
 ) -> str:
     """Full HTML document for embed: WhatsApp-style chat + JS scroll restore / jump to bottom."""
     fab = _team_chat_scroll_fab_html()
@@ -394,6 +396,7 @@ def _team_chat_iframe_doc(
         messages, participant_label, feed_max_px, extra_bottom_html=fab
     )
     css = _team_chat_css()
+    force_js = "true" if force_scroll_to_bottom else "false"
     return f"""<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"/>
@@ -407,6 +410,7 @@ body {{ background: #efeae2; }}
 {inner}
 <script>
 (function () {{
+  const FORCE = {force_js};
   const SCROLL_THRESHOLD = 8;
   const feed = document.querySelector('.tc-feed');
   const fabWrap = document.querySelector('.tc-scroll-fab-wrap');
@@ -441,8 +445,14 @@ body {{ background: #efeae2; }}
   if (feed) {{
     let saved = null;
     try {{ saved = sessionStorage.getItem(SK); }} catch (e) {{}}
+    // One-shot force scroll (used when Participant sends a message).
+    if (FORCE) {{
+      toBottom();
+      setPinned(true);
+      try {{ sessionStorage.removeItem(SK); }} catch (e) {{}}
+    }}
     // Restore scroll position unless we were previously pinned to bottom.
-    if (getPinned()) {{
+    else if (getPinned()) {{
       toBottom();
     }} else if (saved !== null && saved !== '') {{
       feed.scrollTop = parseInt(saved, 10) || 0;
@@ -527,6 +537,8 @@ if "pending_bot_turn" not in st.session_state:
     # Non-blocking typing simulation. When set, the UI can accept Participant input
     # while a bot is "thinking/typing", avoiding reordering caused by time.sleep.
     st.session_state.pending_bot_turn = None
+if "force_scroll_to_bottom_once" not in st.session_state:
+    st.session_state.force_scroll_to_bottom_once = False
 
 for _name in AI_NAMES:
     _wk = f"tune_w_{_name}"
@@ -712,12 +724,16 @@ div[data-testid="stChatInputContainer"] textarea {
 @st.fragment(run_every=FRAGMENT_REFRESH_SEC)
 def chat_messages_panel():
     feed_h = max(120, CHAT_SCROLL_HEIGHT_PX - 72)
+    _force_scroll = bool(st.session_state.get("force_scroll_to_bottom_once", False))
+    if _force_scroll:
+        st.session_state.force_scroll_to_bottom_once = False
 
     components.html(
         _team_chat_iframe_doc(
             st.session_state.messages,
             participant_id,
             feed_h,
+            force_scroll_to_bottom=_force_scroll,
         ),
         height=CHAT_SCROLL_HEIGHT_PX + 4,
         scrolling=False,
@@ -739,6 +755,8 @@ def chat_messages_panel():
         st.session_state.bot_turns_since_human = 0
         # If a bot was mid "typing", cancel it so the next bot reply can react to the new human line.
         st.session_state.pending_bot_turn = None
+        # Always jump chat feed to latest line when Participant sends.
+        st.session_state.force_scroll_to_bottom_once = True
         if st.session_state.sim_active:
             st.session_state.next_ai_time = time.time() + random.uniform(*HUMAN_REPLY_DELAY_RANGE)
             # Let several bots respond in quick succession so the human isn’t dropped after one reply
