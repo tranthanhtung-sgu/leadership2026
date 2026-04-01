@@ -28,6 +28,15 @@ except ImportError:  # deploy may have older character_configs without this help
 
 from agents import get_agent
 
+
+def _cfg_think_delay(cfg) -> tuple[float, float]:
+    """Support older deployed character_configs without ``think_delay`` on CharacterConfig."""
+    td = getattr(cfg, "think_delay", None)
+    if td is not None:
+        return td
+    return cfg.typing_delay
+
+
 # ==========================================
 # 0. PASSWORD PROTECTION
 # ==========================================
@@ -358,7 +367,7 @@ for _name in AI_NAMES:
         st.session_state[_tk] = format_typing_delay(CHARACTERS[_name].typing_delay)
     _think = f"tune_think_{_name}"
     if _think not in st.session_state:
-        st.session_state[_think] = format_typing_delay(CHARACTERS[_name].think_delay)
+        st.session_state[_think] = format_typing_delay(_cfg_think_delay(CHARACTERS[_name]))
 
 # ==========================================
 # 4. SIDEBAR CONTROLS
@@ -639,11 +648,12 @@ def chat_messages_panel():
                     recent_messages=st.session_state.messages,
                 )
 
+        _think_fallback = _cfg_think_delay(cfg)
         think_raw = st.session_state.get(
             f"tune_think_{speaker}",
-            format_typing_delay(cfg.think_delay),
+            format_typing_delay(_think_fallback),
         )
-        t_lo, t_hi = parse_typing_delay(str(think_raw), cfg.think_delay)
+        t_lo, t_hi = parse_typing_delay(str(think_raw), _think_fallback)
         time.sleep(random.uniform(t_lo, t_hi))
 
         td_raw = st.session_state.get(
