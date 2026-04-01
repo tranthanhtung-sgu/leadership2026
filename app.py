@@ -1,11 +1,13 @@
+import html
+import io
+import os
+import random
+import time
+from datetime import datetime
+
+import pandas as pd
 import streamlit as st
 from openai import OpenAI
-import time
-import random
-import os
-import io
-import pandas as pd
-from datetime import datetime
 
 from character_configs import (
     AI_NAMES,
@@ -85,6 +87,228 @@ POST_HUMAN_BOT_WINDOW = 5
 
 # Scroll this area only; keeps the participant chat box from being pushed off-screen.
 CHAT_SCROLL_HEIGHT_PX = 560
+
+# WhatsApp-Web–style peer row: pastel avatar, coloured display name
+_SPEAKER_CHAT_STYLE: dict[str, dict[str, str]] = {
+    "Zoe": {"avatar_bg": "#cfefff", "avatar_fg": "#075e54", "name": "#0284c7"},
+    "Femke": {"avatar_bg": "#ffe8cc", "avatar_fg": "#a05000", "name": "#dd6b20"},
+    "Hao": {"avatar_bg": "#d8f5e3", "avatar_fg": "#075e54", "name": "#128c7e"},
+}
+_DEFAULT_PEER_STYLE = {"avatar_bg": "#e1e8e4", "avatar_fg": "#54656f", "name": "#54656f"}
+
+
+def _team_chat_message_html(messages: list[dict], participant_label: str, feed_max_px: int) -> str:
+    """WhatsApp-like pane: group header, doodle-pattern feed, left incoming / right outgoing."""
+    rows: list[str] = []
+    for m in messages:
+        speaker = str(m.get("speaker") or "?")
+        raw = m.get("text") or ""
+        text_safe = html.escape(raw).replace("\n", "<br/>")
+        ts = html.escape(str(m.get("timestamp") or ""))
+        if speaker == "Participant":
+            tick = '<span class="tc-ticks" aria-hidden="true">✓✓</span>'
+            time_html = f'<span class="tc-time">{ts}</span>' if ts else ""
+            rows.append(
+                '<div class="tc-row tc-row-self">'
+                '<div class="tc-bubble-wrap tc-bubble-wrap-self">'
+                '<div class="tc-bubble tc-bubble-self">'
+                f'<div class="tc-bubble-body">{text_safe}</div>'
+                f'<div class="tc-bubble-foot">{time_html}{tick}</div>'
+                "</div></div></div>"
+            )
+        else:
+            st = _SPEAKER_CHAT_STYLE.get(speaker, _DEFAULT_PEER_STYLE)
+            initial = html.escape(speaker[:1].upper())
+            nm = html.escape(speaker)
+            time_html = f'<span class="tc-time">{ts}</span>' if ts else ""
+            rows.append(
+                '<div class="tc-row tc-row-peer">'
+                f'<div class="tc-avatar" style="background:{st["avatar_bg"]};color:{st["avatar_fg"]};">'
+                f"{initial}</div>"
+                '<div class="tc-bubble-wrap">'
+                f'<div class="tc-peer-name" style="color:{st["name"]};">{nm}</div>'
+                '<div class="tc-bubble tc-bubble-peer">'
+                f'<div class="tc-bubble-body">{text_safe}</div>'
+                f'<div class="tc-bubble-foot">{time_html}</div>'
+                "</div></div></div>"
+            )
+    body = "".join(rows)
+    pl = html.escape(participant_label)
+    names_sub = html.escape("Zoe, Femke, Hao, You")
+    return f"""
+<div class="tc-window" style="min-height:{CHAT_SCROLL_HEIGHT_PX}px; max-height:{CHAT_SCROLL_HEIGHT_PX}px;">
+  <header class="tc-header">
+    <div class="tc-header-lead">
+      <div class="tc-header-icon" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="9" cy="8" r="3.5" stroke="currentColor" stroke-width="1.6"/>
+          <circle cx="15" cy="9" r="2.8" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M4 19.5c.8-4 4.2-6 8-6s7.2 2 8 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div>
+        <div class="tc-header-title">Study team chat</div>
+        <div class="tc-header-sub">{names_sub} · <span class="tc-header-id">{pl}</span></div>
+      </div>
+    </div>
+  </header>
+  <div class="tc-feed" style="min-height:{feed_max_px}px; height:{feed_max_px}px; max-height:{feed_max_px}px; box-sizing:border-box;">{body}</div>
+</div>
+"""
+
+
+def _team_chat_css() -> str:
+    return """
+<style>
+/* WhatsApp-Web–inspired team chat (not GPT single-column layout) */
+.tc-window {
+  display: flex;
+  flex-direction: column;
+  border-radius: 0;
+  overflow: hidden;
+  border: 1px solid #d1d7db;
+  box-shadow: 0 1px 4px rgba(11,20,26,.08);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  flex: 1 1 auto;
+}
+.tc-header {
+  flex-shrink: 0;
+  padding: 0.5rem 1rem;
+  background: #f0f2f5;
+  border-bottom: 1px solid #e9edef;
+}
+.tc-header-lead {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+.tc-header-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #25d366;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.tc-header-title {
+  font-weight: 600;
+  font-size: 1rem;
+  color: #111b21;
+  letter-spacing: -0.02em;
+}
+.tc-header-sub {
+  font-size: 0.8125rem;
+  color: #667781;
+  margin-top: 0.05rem;
+  line-height: 1.25;
+}
+.tc-header-id { color: #41525d; font-weight: 500; }
+/* Feed: full-height WhatsApp-style beige + subtle texture (empty or not) */
+.tc-feed {
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0.6rem 0.65rem 1rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  background-color: #efeae2;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='%23d1ccc4' fill-opacity='0.35'%3E%3Ccircle cx='8' cy='12' r='1.2'/%3E%3Ccircle cx='52' cy='38' r='0.9'/%3E%3Ccircle cx='28' cy='64' r='1'/%3E%3Ccircle cx='70' cy='8' r='0.8'/%3E%3Ccircle cx='38' cy='22' r='0.7'/%3E%3Cpath d='M60 55 L62 58 L59 58 Z'/%3E%3Crect x='20' y='45' width='3' height='3' rx='0.5' opacity='0.6'/%3E%3C/g%3E%3C/svg%3E");
+}
+.tc-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.4rem;
+  margin-bottom: 0.35rem;
+  max-width: 100%;
+}
+.tc-row-peer { justify-content: flex-start; }
+.tc-row-self { justify-content: flex-end; }
+.tc-avatar {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.8rem;
+  align-self: flex-end;
+  margin-bottom: 2px;
+}
+.tc-bubble-wrap { max-width: min(82%, 480px); display: flex; flex-direction: column; }
+.tc-bubble-wrap-self { align-items: flex-end; }
+.tc-peer-name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  margin: 0 0 0.15rem 0.35rem;
+}
+.tc-bubble {
+  position: relative;
+  padding: 0.35rem 0.55rem 0.45rem 0.65rem;
+  border-radius: 7.5px;
+  font-size: 0.9025rem;
+  line-height: 1.42;
+  color: #111b21;
+  word-wrap: break-word;
+  box-shadow: 0 1px 0.5px rgba(11,20,26,.13);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.2rem 0.45rem;
+}
+.tc-bubble-peer {
+  background: #fff;
+  border-top-left-radius: 0;
+}
+.tc-bubble-self {
+  background: #d9fdd3;
+  border-top-right-radius: 0;
+}
+.tc-bubble-body {
+  flex: 1 1 auto;
+  min-width: 3.5rem;
+}
+.tc-bubble-foot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+.tc-time {
+  font-size: 0.6875rem;
+  color: #667781;
+  white-space: nowrap;
+  line-height: 1;
+}
+.tc-bubble-self .tc-time { color: #667781; }
+.tc-ticks {
+  font-size: 0.65rem;
+  color: #53bdeb;
+  letter-spacing: -2px;
+  line-height: 1;
+}
+@media (prefers-color-scheme: dark) {
+  .tc-window { border-color: #2a3942; }
+  .tc-header { background: #202c33; border-bottom-color: #2a3942; }
+  .tc-header-title { color: #e9edef; }
+  .tc-header-sub { color: #8696a0; }
+  .tc-header-id { color: #aebac1; }
+  .tc-header-icon { background: #25d366; }
+  .tc-feed {
+    background-color: #0b141a;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='%232a3942' fill-opacity='0.5'%3E%3Ccircle cx='8' cy='12' r='1.2'/%3E%3Ccircle cx='52' cy='38' r='0.9'/%3E%3Ccircle cx='28' cy='64' r='1'/%3E%3Ccircle cx='70' cy='8' r='0.8'/%3E%3C/g%3E%3C/svg%3E");
+  }
+  .tc-bubble-peer { background: #202c33; color: #e9edef; box-shadow: 0 1px 0.5px rgba(0,0,0,.35); }
+  .tc-bubble-self { background: #005c4b; color: #e9edef; }
+  .tc-time { color: #8696a0 !important; }
+}
+</style>
+"""
+
 
 # ==========================================
 # 2. DATA LOADING FUNCTIONS
@@ -262,20 +486,49 @@ st.info(
 )
 
 st.markdown(
-    """
+    _team_chat_css()
+    + """
 <style>
-/* Keep the participant chat field visible: stick to viewport bottom + backdrop */
+/* Paint Streamlit wrappers beige so empty chat is not a white slab */
+div[data-testid="stMarkdownContainer"]:has(.tc-window) {
+  background: #efeae2 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  min-height: """
+    + str(CHAT_SCROLL_HEIGHT_PX)
+    + """px;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.tc-window) {
+  background: #efeae2 !important;
+}
+@media (prefers-color-scheme: dark) {
+  div[data-testid="stMarkdownContainer"]:has(.tc-window),
+  div[data-testid="stVerticalBlockBorderWrapper"]:has(.tc-window) {
+    background: #0b141a !important;
+  }
+}
+/* Composer: feels like Slack/Teams input bar */
 div[data-testid="stChatInputContainer"] {
     position: sticky;
     bottom: 0;
     z-index: 999;
     padding-top: 0.5rem;
-    margin-top: 0.25rem;
+    margin-top: 0.75rem;
     background: var(--background-color, #ffffff);
+    border-top: 1px solid rgba(0,0,0,0.08);
+}
+div[data-testid="stChatInputContainer"] textarea {
+    border-radius: 12px !important;
+    border: 1px solid #d1d5db !important;
+    min-height: 2.75rem !important;
 }
 @media (prefers-color-scheme: dark) {
     div[data-testid="stChatInputContainer"] {
         background: var(--background-color, #0e1117);
+        border-top-color: #333;
+    }
+    div[data-testid="stChatInputContainer"] textarea {
+        border-color: #404040 !important;
     }
 }
 </style>
@@ -288,19 +541,24 @@ div[data-testid="stChatInputContainer"] {
 # ==========================================
 @st.fragment(run_every=FRAGMENT_REFRESH_SEC)
 def chat_messages_panel():
+    feed_h = max(120, CHAT_SCROLL_HEIGHT_PX - 72)
     with st.container(height=CHAT_SCROLL_HEIGHT_PX, border=False):
-        for m in st.session_state.messages:
-            with st.chat_message(m["speaker"]):
-                st.write(f"**{m['speaker']}**:")
-                st.text(m['text'])
-        if not st.session_state.sim_active and not st.session_state.messages:
-            st.caption("Simulation not started. Use ▶ START in the sidebar.")
-        elif not st.session_state.sim_active and st.session_state.messages:
-            st.caption("Simulation **stopped** — transcript below. Click ▶ START to resume AI.")
+        st.markdown(
+            _team_chat_message_html(
+                st.session_state.messages,
+                participant_id,
+                feed_h,
+            ),
+            unsafe_allow_html=True,
+        )
+    if not st.session_state.sim_active and not st.session_state.messages:
+        st.caption("Simulation not started. Use ▶ START in the sidebar.")
+    elif not st.session_state.sim_active and st.session_state.messages:
+        st.caption("Simulation **stopped** — transcript above. Click ▶ START to resume AI.")
 
     # Process participant input before any think/typing/API so the message shows on the next rerun
     # without waiting for the current bot turn to finish.
-    if prompt := st.chat_input("Join the conversation... (type any time)"):
+    if prompt := st.chat_input("Type a message"):
         st.session_state.messages.append({
             "speaker": "Participant",
             "text": prompt,
