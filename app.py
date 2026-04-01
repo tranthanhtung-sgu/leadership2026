@@ -13,6 +13,7 @@ from character_configs import (
     format_typing_delay,
     parse_typing_delay,
     pick_next_speaker,
+    plan_contribution_nudge,
 )
 from agents import get_agent
 
@@ -48,8 +49,40 @@ MODEL_NAME = "gpt-5.2"
 # Timing tuned for snappier chat (seconds)
 FRAGMENT_REFRESH_SEC = 1.2
 START_WARMUP_SEC = 0.8
-HUMAN_REPLY_DELAY_RANGE = (1.5, 3.2)
+# Longer pause after the human sends so they can read before bots pile on
+HUMAN_REPLY_DELAY_RANGE = (7.0, 16.0)
 IDLE_AFTER_BURST_RANGE = (5.0, 9.0)
+# Extra idle after a burst if the Participant spoke recently (reading / jump-in window)
+PARTICIPANT_RECENT_IDLE_RANGE = (16.0, 32.0)
+# After this many consecutive AI lines without the Participant, Zoe gets a soft “human in the room” nudge.
+# Repeats every PARTICIPANT_INVITE_REPEAT_EVERY further AI turns so a silent Participant isn’t dropped after the opening.
+PARTICIPANT_INVITE_FIRST_BOT_TURNS = 5
+PARTICIPANT_INVITE_REPEAT_EVERY = 7
+PARTICIPANT_INVITE_EXTRA = (
+    "(Facilitator nudge: the human teammate is in this chat but has been quiet — "
+    "one short, natural line that leaves them room to jump in or reacts to the thread without demanding an answer; "
+    "do not re-ask the same question or A/B you already used; you can mostly talk to teammates but nod to them.)"
+)
+
+
+def _participant_invite_due(bot_turns: int, first: int, every: int) -> bool:
+    """True on first at `first`, then every `every` additional AI-only turns (e.g. 5, 12, 19, …)."""
+    if bot_turns < first:
+        return False
+    if bot_turns == first:
+        return True
+    return (bot_turns - first) % every == 0
+
+
+# Quiet-teammate draw-ins (sidebar controls removed; adjust here if needed.)
+QUIET_DRAW_IN_LINES_BELOW = 3
+QUIET_DRAW_IN_WINDOW = 40
+QUIET_DRAW_IN_MIN_AI = 8
+QUIET_DRAW_IN_COOLDOWN = 5
+QUIET_DRAW_IN_ADDRESS_LOOKBACK = 10
+QUIET_DRAW_IN_ROLL = 0.5
+POST_HUMAN_BOT_WINDOW = 5
+
 # Scroll this area only; keeps the participant chat box from being pushed off-screen.
 CHAT_SCROLL_HEIGHT_PX = 560
 
@@ -78,6 +111,10 @@ if "ai_burst_remaining" not in st.session_state:
     st.session_state.ai_burst_remaining = 0
 if "api_count" not in st.session_state:
     st.session_state.api_count = 0
+if "bot_turns_since_human" not in st.session_state:
+    st.session_state.bot_turns_since_human = 0
+if "last_contribution_nudge_at_ai_count" not in st.session_state:
+    st.session_state.last_contribution_nudge_at_ai_count = -10_000
 
 for _name in AI_NAMES:
     _wk = f"tune_w_{_name}"
@@ -86,6 +123,9 @@ for _name in AI_NAMES:
         st.session_state[_wk] = float(CHARACTERS[_name].default_weight)
     if _tk not in st.session_state:
         st.session_state[_tk] = format_typing_delay(CHARACTERS[_name].typing_delay)
+    _think = f"tune_think_{_name}"
+    if _think not in st.session_state:
+        st.session_state[_think] = format_typing_delay(CHARACTERS[_name].think_delay)
 
 # ==========================================
 # 4. SIDEBAR CONTROLS
@@ -132,6 +172,11 @@ with st.sidebar.expander("🎛️ Character pacing (live)", expanded=True):
             key=f"tune_td_{_n}",
             help="Example: 0.15,0.45",
         )
+        st.text_input(
+            f"{_n} — think delay before typing (min,max sec)",
+            key=f"tune_think_{_n}",
+            help="Pause after the last message before this teammate starts typing.",
+        )
 
 with st.sidebar.expander("📝 Edit Scenario / Rules", expanded=False):
     scenario_content = st.text_area("Scenario Context", value=initial_scenario, height=150)
@@ -158,6 +203,8 @@ if col_reset.button("⏹ RESET"):
     st.session_state.next_ai_time = 0.0
     st.session_state.ai_burst_remaining = 0
     st.session_state.api_count = 0
+    st.session_state.bot_turns_since_human = 0
+    st.session_state.last_contribution_nudge_at_ai_count = -10_000
     st.rerun()
 
 if st.sidebar.button("💾 EXPORT TRANSCRIPT"):
@@ -182,9 +229,9 @@ if st.sidebar.button("💾 EXPORT TRANSCRIPT"):
 # ==========================================
 # 5. AI ENGINE (three distinct agents; one API call per turn)
 # ==========================================
-def run_agent_turn(speaker: str):
+def run_agent_turn(speaker: str, extra_instruction: str | None = None) -> bool:
+    """Append one AI line; return False on API failure (caller should not count the turn)."""
     agent = get_agent(speaker)
-    cfg = agent.config
     try:
         txt, n_api = agent.generate_reply(
             client,
@@ -193,14 +240,18 @@ def run_agent_turn(speaker: str):
             leadership_style,
             scenario_content,
             behavioral_content,
+            extra_instruction=extra_instruction,
         )
+        st.session_state.api_count += n_api
+        if not (txt or "").strip():
+            return False
         st.session_state.messages.append({
             "speaker": speaker, "text": txt, "timestamp": datetime.now().strftime("%H:%M:%S")
         })
-        st.session_state.api_count += n_api
+        return True
     except Exception as e:
         st.error(f"AI Error ({speaker}): {e}")
-    return cfg
+        return False
 
 # ==========================================
 # 6. MAIN UI - INFO BAR
@@ -233,7 +284,7 @@ div[data-testid="stChatInputContainer"] {
 )
 
 # ==========================================
-# 7. ASYNC CHAT UI
+# 7. ASYNC CHAT UI (fragment timer; chat_input runs before AI work in the fragment)
 # ==========================================
 @st.fragment(run_every=FRAGMENT_REFRESH_SEC)
 def chat_messages_panel():
@@ -247,6 +298,21 @@ def chat_messages_panel():
         elif not st.session_state.sim_active and st.session_state.messages:
             st.caption("Simulation **stopped** — transcript below. Click ▶ START to resume AI.")
 
+    # Process participant input before any think/typing/API so the message shows on the next rerun
+    # without waiting for the current bot turn to finish.
+    if prompt := st.chat_input("Join the conversation... (type any time)"):
+        st.session_state.messages.append({
+            "speaker": "Participant",
+            "text": prompt,
+            "timestamp": datetime.now().strftime("%H:%M:%S"),
+        })
+        st.session_state.bot_turns_since_human = 0
+        if st.session_state.sim_active:
+            st.session_state.next_ai_time = time.time() + random.uniform(*HUMAN_REPLY_DELAY_RANGE)
+            # Let several bots respond in quick succession so the human isn’t dropped after one reply
+            st.session_state.ai_burst_remaining = random.randint(3, 5)
+        st.rerun()
+
     if not st.session_state.sim_active:
         return
 
@@ -259,12 +325,59 @@ def chat_messages_panel():
             last_speaker, last_text = last["speaker"], last.get("text", "")
 
         weight_map = {n: float(st.session_state[f"tune_w_{n}"]) for n in AI_NAMES}
-        speaker, cfg = pick_next_speaker(
-            last_speaker,
-            last_text,
-            weights_override=weight_map,
-            recent_messages=st.session_state.messages,
+        extra_instruction: str | None = None
+        used_contribution_nudge = False
+        current_ai_total = sum(
+            1 for m in st.session_state.messages if m.get("speaker") in AI_NAMES
         )
+
+        if last_speaker != "Participant" and _participant_invite_due(
+            st.session_state.bot_turns_since_human,
+            first=max(2, PARTICIPANT_INVITE_FIRST_BOT_TURNS),
+            every=max(3, PARTICIPANT_INVITE_REPEAT_EVERY),
+        ):
+            speaker = "Zoe"
+            cfg = CHARACTERS["Zoe"]
+            extra_instruction = PARTICIPANT_INVITE_EXTRA
+        else:
+            nudge_plan = None
+            _roll = float(QUIET_DRAW_IN_ROLL)
+            if st.session_state.bot_turns_since_human < POST_HUMAN_BOT_WINDOW:
+                _roll = 0.0
+            if _roll > 0 and random.random() < _roll:
+                nudge_plan = plan_contribution_nudge(
+                    st.session_state.messages,
+                    weight_map,
+                    last_speaker=last_speaker,
+                    last_text=last_text,
+                    quiet_if_lines_below=QUIET_DRAW_IN_LINES_BELOW,
+                    count_window=QUIET_DRAW_IN_WINDOW,
+                    min_ai_messages=QUIET_DRAW_IN_MIN_AI,
+                    address_lookback=QUIET_DRAW_IN_ADDRESS_LOOKBACK,
+                    current_ai_total=current_ai_total,
+                    ai_count_at_last_nudge=int(
+                        st.session_state.last_contribution_nudge_at_ai_count
+                    ),
+                    cooldown_ai_messages=QUIET_DRAW_IN_COOLDOWN,
+                )
+            if nudge_plan is not None:
+                speaker, _target, extra_instruction = nudge_plan
+                cfg = CHARACTERS[speaker]
+                used_contribution_nudge = True
+            else:
+                speaker, cfg = pick_next_speaker(
+                    last_speaker,
+                    last_text,
+                    weights_override=weight_map,
+                    recent_messages=st.session_state.messages,
+                )
+
+        think_raw = st.session_state.get(
+            f"tune_think_{speaker}",
+            format_typing_delay(cfg.think_delay),
+        )
+        t_lo, t_hi = parse_typing_delay(str(think_raw), cfg.think_delay)
+        time.sleep(random.uniform(t_lo, t_hi))
 
         td_raw = st.session_state.get(
             f"tune_td_{speaker}",
@@ -274,7 +387,19 @@ def chat_messages_panel():
 
         with st.spinner(f"{speaker} is typing..."):
             time.sleep(random.uniform(lo, hi))
-            cfg = run_agent_turn(speaker)
+            ok = run_agent_turn(speaker, extra_instruction=extra_instruction)
+
+        if not ok:
+            st.session_state.next_ai_time = time.time() + 4.0
+            return
+
+        if used_contribution_nudge:
+            st.session_state.last_contribution_nudge_at_ai_count = sum(
+                1 for m in st.session_state.messages if m.get("speaker") in AI_NAMES
+            )
+
+        cfg = CHARACTERS[speaker]
+        st.session_state.bot_turns_since_human += 1
 
         g0, g1 = cfg.burst_gap
         gap_after = random.uniform(g0, g1)
@@ -283,20 +408,13 @@ def chat_messages_panel():
             st.session_state.next_ai_time = time.time() + gap_after
             st.session_state.ai_burst_remaining -= 1
         else:
-            st.session_state.next_ai_time = time.time() + random.uniform(*IDLE_AFTER_BURST_RANGE)
+            tail = st.session_state.messages[-6:]
+            if any(m.get("speaker") == "Participant" for m in tail):
+                idle_lo, idle_hi = PARTICIPANT_RECENT_IDLE_RANGE
+            else:
+                idle_lo, idle_hi = IDLE_AFTER_BURST_RANGE
+            st.session_state.next_ai_time = time.time() + random.uniform(idle_lo, idle_hi)
             st.session_state.ai_burst_remaining = random.randint(1, 3)
 
 
 chat_messages_panel()
-
-if prompt := st.chat_input("Join the conversation... (type any time)"):
-    st.session_state.messages.append({
-        "speaker": "Participant",
-        "text": prompt,
-        "timestamp": datetime.now().strftime("%H:%M:%S")
-    })
-    # Only schedule AI replies while simulation is running (STOP / no START = no API use).
-    if st.session_state.sim_active:
-        st.session_state.next_ai_time = time.time() + random.uniform(*HUMAN_REPLY_DELAY_RANGE)
-        st.session_state.ai_burst_remaining = 1
-    st.rerun()
