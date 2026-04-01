@@ -7,6 +7,7 @@ from datetime import datetime
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from openai import OpenAI
 
 from character_configs import (
@@ -115,7 +116,13 @@ _SPEAKER_CHAT_STYLE: dict[str, dict[str, str]] = {
 _DEFAULT_PEER_STYLE = {"avatar_bg": "#e1e8e4", "avatar_fg": "#54656f", "name": "#54656f"}
 
 
-def _team_chat_message_html(messages: list[dict], participant_label: str, feed_max_px: int) -> str:
+def _team_chat_message_html(
+    messages: list[dict],
+    participant_label: str,
+    feed_max_px: int,
+    *,
+    extra_bottom_html: str = "",
+) -> str:
     """WhatsApp-like pane: group header, doodle-pattern feed, left incoming / right outgoing."""
     rows: list[str] = []
     for m in messages:
@@ -171,6 +178,7 @@ def _team_chat_message_html(messages: list[dict], participant_label: str, feed_m
     </div>
   </header>
   <div class="tc-feed" style="min-height:{feed_max_px}px; height:{feed_max_px}px; max-height:{feed_max_px}px; box-sizing:border-box;">{body}</div>
+  {extra_bottom_html}
 </div>
 """
 
@@ -184,10 +192,42 @@ def _team_chat_css() -> str:
   flex-direction: column;
   border-radius: 0;
   overflow: hidden;
+  position: relative;
   border: 1px solid #d1d7db;
   box-shadow: 0 1px 4px rgba(11,20,26,.08);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   flex: 1 1 auto;
+}
+.tc-scroll-fab-wrap {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 50;
+  pointer-events: none;
+}
+.tc-scroll-fab-wrap .tc-scroll-fab {
+  pointer-events: auto;
+}
+.tc-scroll-fab {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(11,20,26,0.2), 0 2px 8px rgba(11,20,26,0.12);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+}
+.tc-scroll-fab:hover {
+  background: #f7f8fa;
+  box-shadow: 0 2px 6px rgba(11,20,26,0.22);
+}
+.tc-scroll-fab:active {
+  transform: scale(0.96);
 }
 .tc-header {
   flex-shrink: 0;
@@ -323,9 +363,100 @@ def _team_chat_css() -> str:
   .tc-bubble-peer { background: #202c33; color: #e9edef; box-shadow: 0 1px 0.5px rgba(0,0,0,.35); }
   .tc-bubble-self { background: #005c4b; color: #e9edef; }
   .tc-time { color: #8696a0 !important; }
+  .tc-scroll-fab { background: #374955; box-shadow: 0 2px 8px rgba(0,0,0,0.35); }
+  .tc-scroll-fab:hover { background: #3d4f5c; }
+  .tc-scroll-fab svg path { stroke: #e9edef !important; }
 }
 </style>
 """
+
+
+def _team_chat_scroll_fab_html() -> str:
+    """WhatsApp-style floating white circle; visibility toggled by JS when feed is not at bottom."""
+    return f'''<div class="tc-scroll-fab-wrap" style="display:none;" aria-hidden="true">
+  <button type="button" class="tc-scroll-fab" id="tcScrollFabBtn" aria-label="Scroll to latest messages">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M6 9l6 6 6-6" stroke="#54656f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
+</div>'''
+
+
+def _team_chat_iframe_doc(
+    messages: list[dict],
+    participant_label: str,
+    feed_max_px: int,
+) -> str:
+    """Full HTML document for embed: WhatsApp-style chat + JS scroll restore / jump to bottom."""
+    fab = _team_chat_scroll_fab_html()
+    inner = _team_chat_message_html(
+        messages, participant_label, feed_max_px, extra_bottom_html=fab
+    )
+    css = _team_chat_css()
+    return f"""<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+{css}
+<style>
+html, body {{ margin: 0; padding: 0; overflow: hidden; height: 100%; }}
+body {{ background: #efeae2; }}
+</style>
+</head><body>
+{inner}
+<script>
+(function () {{
+  const SCROLL_THRESHOLD = 8;
+  const feed = document.querySelector('.tc-feed');
+  const fabWrap = document.querySelector('.tc-scroll-fab-wrap');
+  function toBottom() {{
+    if (!feed) return;
+    feed.scrollTop = feed.scrollHeight;
+  }}
+  function isScrolledUp() {{
+    if (!feed) return false;
+    var gap = feed.scrollHeight - feed.clientHeight - feed.scrollTop;
+    return gap > SCROLL_THRESHOLD;
+  }}
+  function updateFabVisibility() {{
+    if (!fabWrap) return;
+    fabWrap.style.display = isScrolledUp() ? 'flex' : 'none';
+    fabWrap.setAttribute('aria-hidden', isScrolledUp() ? 'false' : 'true');
+  }}
+  const SK = 'tc_feed_scrolltop_v1';
+  if (feed) {{
+    let saved = null;
+    try {{ saved = sessionStorage.getItem(SK); }} catch (e) {{}}
+    if (saved !== null && saved !== '') {{
+      feed.scrollTop = parseInt(saved, 10) || 0;
+    }} else {{
+      toBottom();
+    }}
+    feed.addEventListener('scroll', function () {{
+      try {{ sessionStorage.setItem(SK, String(feed.scrollTop)); }} catch (e) {{}}
+      updateFabVisibility();
+    }}, {{ passive: true }});
+    if (typeof ResizeObserver !== 'undefined') {{
+      try {{
+        var ro = new ResizeObserver(function () {{ updateFabVisibility(); }});
+        ro.observe(feed);
+      }} catch (e) {{}}
+    }}
+    requestAnimationFrame(updateFabVisibility);
+    setTimeout(updateFabVisibility, 100);
+  }}
+  var fab = document.getElementById('tcScrollFabBtn');
+  if (fab) {{
+    fab.addEventListener('click', function (ev) {{
+      ev.preventDefault();
+      toBottom();
+      try {{ sessionStorage.removeItem(SK); }} catch (e1) {{}}
+      updateFabVisibility();
+    }});
+  }}
+}})();
+</script>
+</body></html>"""
 
 
 # ==========================================
@@ -507,24 +638,6 @@ st.markdown(
     _team_chat_css()
     + """
 <style>
-/* Paint Streamlit wrappers beige so empty chat is not a white slab */
-div[data-testid="stMarkdownContainer"]:has(.tc-window) {
-  background: #efeae2 !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  min-height: """
-    + str(CHAT_SCROLL_HEIGHT_PX)
-    + """px;
-}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.tc-window) {
-  background: #efeae2 !important;
-}
-@media (prefers-color-scheme: dark) {
-  div[data-testid="stMarkdownContainer"]:has(.tc-window),
-  div[data-testid="stVerticalBlockBorderWrapper"]:has(.tc-window) {
-    background: #0b141a !important;
-  }
-}
 /* Composer: feels like Slack/Teams input bar */
 div[data-testid="stChatInputContainer"] {
     position: sticky;
@@ -560,15 +673,17 @@ div[data-testid="stChatInputContainer"] textarea {
 @st.fragment(run_every=FRAGMENT_REFRESH_SEC)
 def chat_messages_panel():
     feed_h = max(120, CHAT_SCROLL_HEIGHT_PX - 72)
-    with st.container(height=CHAT_SCROLL_HEIGHT_PX, border=False):
-        st.markdown(
-            _team_chat_message_html(
-                st.session_state.messages,
-                participant_id,
-                feed_h,
-            ),
-            unsafe_allow_html=True,
-        )
+
+    components.html(
+        _team_chat_iframe_doc(
+            st.session_state.messages,
+            participant_id,
+            feed_h,
+        ),
+        height=CHAT_SCROLL_HEIGHT_PX + 4,
+        scrolling=False,
+    )
+
     if not st.session_state.sim_active and not st.session_state.messages:
         st.caption("Simulation not started. Use ▶ START in the sidebar.")
     elif not st.session_state.sim_active and st.session_state.messages:
