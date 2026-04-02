@@ -807,6 +807,9 @@ _sim_status = "**Running**" if st.session_state.sim_active else "**Stopped** (AI
 st.info(
     f"Condition: **{leadership_style}** | Participant: **{participant_id}** | Sim: {_sim_status}"
 )
+st.caption(
+    "Chat: use **Enter** or the send arrow to submit. Very quick double-Enter may count as one send."
+)
 
 st.markdown(
     _team_chat_css()
@@ -846,7 +849,6 @@ div[data-testid="stChatInputContainer"] textarea {
 if prompt := st.chat_input(
     "Type a message",
     key=PARTICIPANT_CHAT_KEY,
-    help="Enter or the arrow button sends. If Enter fires twice quickly, only one line is kept.",
 ):
     _pt = (prompt or "").strip()
     if not _pt:
