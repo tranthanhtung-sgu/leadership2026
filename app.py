@@ -4,6 +4,7 @@ import logging
 import os
 import random
 import sys
+import tempfile
 import time
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
@@ -115,54 +116,104 @@ CHAT_SCROLL_HEIGHT_PX = 560
 PARTICIPANT_CHAT_KEY = "participant_chat_in"
 
 # Set LEADERSHIP_CHAT_DEBUG=0 (or false/off) to disable.
-# Logs directory: logs/chat_debug.log (rotating). Use sidebar “Download debug log” to save a copy.
-# For Streamlit Community Cloud (Manage app → Logs): set LEADERSHIP_CHAT_DEBUG_STDERR=1 so lines
-# also go to stderr (Cloud has no persistent logs/ folder).
-_CHAT_DEBUG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
-_CHAT_DEBUG_FILE = os.path.join(_CHAT_DEBUG_DIR, "chat_debug.log")
+# (1) In-memory ring buffer in session_state — works on Streamlit Cloud.
+# (2) Rotating file under ./logs/ if writable, else under system temp (Cloud app dirs are often read-only).
+# For “Manage app → Logs”: LEADERSHIP_CHAT_DEBUG_STDERR=1 mirrors lines to stderr.
+_CHAT_DEBUG_DIR_APP = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+_CHAT_DEBUG_DIR_TMP = os.path.join(tempfile.gettempdir(), "leadership_streamlit_chat")
 _CHAT_DEBUG_LOGGER = logging.getLogger("leadership_chat_debug")
+_CHAT_DEBUG_FILE_EFFECTIVE: str | None = None
+
+CHAT_DEBUG_BUFFER_KEY = "_chat_debug_ring"
+CHAT_DEBUG_BUFFER_MAX = 5000
+
+
+def _chat_debug_buffer_append(line: str) -> None:
+    try:
+        buf: list[str] = st.session_state.setdefault(CHAT_DEBUG_BUFFER_KEY, [])
+    except Exception:
+        return
+    buf.append(line)
+    over = len(buf) - CHAT_DEBUG_BUFFER_MAX
+    if over > 0:
+        del buf[:over]
 
 
 def _chat_debug_log(fmt: str, *args: object) -> None:
+    global _CHAT_DEBUG_FILE_EFFECTIVE
     v = os.environ.get("LEADERSHIP_CHAT_DEBUG", "1").strip().lower()
     if v in {"0", "false", "no", "off"}:
         return
+    try:
+        body = fmt % args if args else fmt
+    except (TypeError, ValueError):
+        body = f"{fmt!s} | {args!r}"
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    _chat_debug_buffer_append(f"{ts} INFO {body}")
+
     if not _CHAT_DEBUG_LOGGER.handlers:
-        os.makedirs(_CHAT_DEBUG_DIR, exist_ok=True)
         _CHAT_DEBUG_LOGGER.setLevel(logging.INFO)
         formatter = logging.Formatter(
             "%(asctime)s %(levelname)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
         )
-        h = RotatingFileHandler(
-            _CHAT_DEBUG_FILE,
-            maxBytes=1_500_000,
-            backupCount=3,
-            encoding="utf-8",
-        )
-        h.setFormatter(formatter)
-        _CHAT_DEBUG_LOGGER.addHandler(h)
+        for fp in (
+            os.path.join(_CHAT_DEBUG_DIR_APP, "chat_debug.log"),
+            os.path.join(_CHAT_DEBUG_DIR_TMP, "chat_debug.log"),
+        ):
+            try:
+                os.makedirs(os.path.dirname(fp), exist_ok=True)
+                h = RotatingFileHandler(
+                    fp,
+                    maxBytes=1_500_000,
+                    backupCount=3,
+                    encoding="utf-8",
+                )
+                h.setFormatter(formatter)
+                _CHAT_DEBUG_LOGGER.addHandler(h)
+                _CHAT_DEBUG_FILE_EFFECTIVE = os.path.abspath(fp)
+                break
+            except OSError:
+                continue
         se = os.environ.get("LEADERSHIP_CHAT_DEBUG_STDERR", "0").strip().lower()
         if se in {"1", "true", "yes", "on"}:
             sh = logging.StreamHandler(sys.stderr)
             sh.setFormatter(formatter)
             _CHAT_DEBUG_LOGGER.addHandler(sh)
+        if not _CHAT_DEBUG_LOGGER.handlers:
+            _CHAT_DEBUG_LOGGER.addHandler(logging.NullHandler())
         _CHAT_DEBUG_LOGGER.propagate = False
     _CHAT_DEBUG_LOGGER.info(fmt, *args)
 
 
 def _bundle_chat_debug_logs_for_download() -> str:
-    """Main log plus numbered RotatingFileHandler backups, for sidebar download."""
-    lines: list[str] = []
-    candidates = [_CHAT_DEBUG_FILE] + [f"{_CHAT_DEBUG_FILE}.{i}" for i in range(1, 5)]
-    for path in candidates:
-        if not os.path.isfile(path):
-            continue
-        try:
-            with open(path, "r", encoding="utf-8", errors="replace") as f:
-                lines.append(f"===== {os.path.basename(path)} =====\n{f.read()}")
-        except OSError:
-            lines.append(f"===== {os.path.basename(path)} =====\n(read error)\n")
-    return "\n".join(lines) if lines else ""
+    """On-disk logs (if any) plus in-memory ring buffer for this browser session."""
+    chunks: list[str] = []
+    base = _CHAT_DEBUG_FILE_EFFECTIVE
+    if not base:
+        candidates = (
+            os.path.join(_CHAT_DEBUG_DIR_APP, "chat_debug.log"),
+            os.path.join(_CHAT_DEBUG_DIR_TMP, "chat_debug.log"),
+        )
+        base = next((p for p in candidates if os.path.isfile(p)), None)
+    if base:
+        for path in [base] + [f"{base}.{i}" for i in range(1, 5)]:
+            if not os.path.isfile(path):
+                continue
+            try:
+                with open(path, "r", encoding="utf-8", errors="replace") as f:
+                    chunks.append(f"===== {os.path.basename(path)} (file) =====\n{f.read()}")
+            except OSError:
+                chunks.append(f"===== {os.path.basename(path)} =====\n(read error)\n")
+    try:
+        buf: list[str] = list(st.session_state.get(CHAT_DEBUG_BUFFER_KEY) or [])
+    except Exception:
+        buf = []
+    if buf:
+        chunks.append(
+            "===== session buffer (this tab; works on Streamlit Cloud) =====\n"
+            + "\n".join(buf)
+        )
+    return "\n\n".join(chunks) if chunks else ""
 
 # WhatsApp-Web–style peer row: pastel avatar, coloured display name
 _SPEAKER_CHAT_STYLE: dict[str, dict[str, str]] = {
@@ -638,23 +689,6 @@ with st.sidebar.expander("🛠️ API Diagnostic Tool", expanded=False):
         except Exception as e:
             st.error(f"Connection Failed: {e}")
 
-with st.sidebar.expander("🐞 Debug log (download)", expanded=False):
-    st.caption(
-        "Chat telemetry is appended under `logs/` while "
-        "`LEADERSHIP_CHAT_DEBUG` is on (default). Remove this expander when you no longer need it."
-    )
-    _log_bundle = _bundle_chat_debug_logs_for_download()
-    st.download_button(
-        "Download debug log",
-        data=_log_bundle.encode("utf-8"),
-        file_name=f"chat_debug_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-        mime="text/plain; charset=utf-8",
-        disabled=not _log_bundle,
-        key="download_chat_debug_log",
-    )
-    if not _log_bundle:
-        st.caption("No log file yet — interact with the chat after a run, or check that debug logging is enabled.")
-
 participant_id = st.sidebar.text_input("Participant ID", value="P-001")
 leadership_style = st.sidebar.select_slider(
     "Zoe Leadership Style",
@@ -1018,3 +1052,23 @@ def chat_messages_panel():
 
 
 chat_messages_panel()
+
+with st.expander("🐞 Debug log (download)", expanded=False):
+    st.caption(
+        "Telemetry is kept in this browser session (ring buffer) and, when possible, under "
+        "`logs/` or the system temp folder. Set `LEADERSHIP_CHAT_DEBUG=0` to disable. "
+        "Remove this expander when you no longer need it."
+    )
+    _log_bundle = _bundle_chat_debug_logs_for_download()
+    st.download_button(
+        "Download debug log",
+        data=_log_bundle.encode("utf-8"),
+        file_name=f"chat_debug_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+        mime="text/plain; charset=utf-8",
+        disabled=not _log_bundle,
+        key="download_chat_debug_log",
+    )
+    if not _log_bundle:
+        st.caption(
+            "No entries yet — use the chat (one fragment tick), then open this expander again."
+        )
