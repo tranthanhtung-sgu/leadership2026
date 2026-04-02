@@ -4,7 +4,8 @@
 # Local copy of boss's original zip (do not publish)
 leadership-streamlit-main-original/
 
-# Local Streamlit chat debug log (LEADERSHIP_CHAT_DEBUG=0 to disable; default on)
+# Local Streamlit chat debug logs (LEADERSHIP_CHAT_DEBUG=0 to disable; default on)
+logs/
 chat_debug.log
 chat_debug.log.*
 

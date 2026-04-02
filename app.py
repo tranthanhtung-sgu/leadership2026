@@ -114,10 +114,12 @@ CHAT_SCROLL_HEIGHT_PX = 560
 # (fragment may call st.rerun(), which would skip any code below it in the same run).
 PARTICIPANT_CHAT_KEY = "participant_chat_in"
 
-# Set LEADERSHIP_CHAT_DEBUG=0 (or false/off) to disable. Log file lives next to this script.
-# For Streamlit Community Cloud (Manage app → Logs): set LEADERSHIP_CHAT_DEBUG_STDERR=1 so the
-# same lines are also written to stderr (Cloud does not expose chat_debug.log on disk).
-_CHAT_DEBUG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chat_debug.log")
+# Set LEADERSHIP_CHAT_DEBUG=0 (or false/off) to disable.
+# Logs directory: logs/chat_debug.log (rotating). Use sidebar “Download debug log” to save a copy.
+# For Streamlit Community Cloud (Manage app → Logs): set LEADERSHIP_CHAT_DEBUG_STDERR=1 so lines
+# also go to stderr (Cloud has no persistent logs/ folder).
+_CHAT_DEBUG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+_CHAT_DEBUG_FILE = os.path.join(_CHAT_DEBUG_DIR, "chat_debug.log")
 _CHAT_DEBUG_LOGGER = logging.getLogger("leadership_chat_debug")
 
 
@@ -126,6 +128,7 @@ def _chat_debug_log(fmt: str, *args: object) -> None:
     if v in {"0", "false", "no", "off"}:
         return
     if not _CHAT_DEBUG_LOGGER.handlers:
+        os.makedirs(_CHAT_DEBUG_DIR, exist_ok=True)
         _CHAT_DEBUG_LOGGER.setLevel(logging.INFO)
         formatter = logging.Formatter(
             "%(asctime)s %(levelname)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
@@ -145,6 +148,21 @@ def _chat_debug_log(fmt: str, *args: object) -> None:
             _CHAT_DEBUG_LOGGER.addHandler(sh)
         _CHAT_DEBUG_LOGGER.propagate = False
     _CHAT_DEBUG_LOGGER.info(fmt, *args)
+
+
+def _bundle_chat_debug_logs_for_download() -> str:
+    """Main log plus numbered RotatingFileHandler backups, for sidebar download."""
+    lines: list[str] = []
+    candidates = [_CHAT_DEBUG_FILE] + [f"{_CHAT_DEBUG_FILE}.{i}" for i in range(1, 5)]
+    for path in candidates:
+        if not os.path.isfile(path):
+            continue
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                lines.append(f"===== {os.path.basename(path)} =====\n{f.read()}")
+        except OSError:
+            lines.append(f"===== {os.path.basename(path)} =====\n(read error)\n")
+    return "\n".join(lines) if lines else ""
 
 # WhatsApp-Web–style peer row: pastel avatar, coloured display name
 _SPEAKER_CHAT_STYLE: dict[str, dict[str, str]] = {
@@ -619,6 +637,23 @@ with st.sidebar.expander("🛠️ API Diagnostic Tool", expanded=False):
             st.session_state.api_count += 1
         except Exception as e:
             st.error(f"Connection Failed: {e}")
+
+with st.sidebar.expander("🐞 Debug log (download)", expanded=False):
+    st.caption(
+        "Chat telemetry is appended under `logs/` while "
+        "`LEADERSHIP_CHAT_DEBUG` is on (default). Remove this expander when you no longer need it."
+    )
+    _log_bundle = _bundle_chat_debug_logs_for_download()
+    st.download_button(
+        "Download debug log",
+        data=_log_bundle.encode("utf-8"),
+        file_name=f"chat_debug_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+        mime="text/plain; charset=utf-8",
+        disabled=not _log_bundle,
+        key="download_chat_debug_log",
+    )
+    if not _log_bundle:
+        st.caption("No log file yet — interact with the chat after a run, or check that debug logging is enabled.")
 
 participant_id = st.sidebar.text_input("Participant ID", value="P-001")
 leadership_style = st.sidebar.select_slider(
