@@ -1,13 +1,15 @@
 import html
 import io
+import logging
 import os
 import random
+import sys
 import time
 from datetime import datetime
+from logging.handlers import RotatingFileHandler
 
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
 from openai import OpenAI
 
 from character_configs import (
@@ -112,6 +114,38 @@ CHAT_SCROLL_HEIGHT_PX = 560
 # (fragment may call st.rerun(), which would skip any code below it in the same run).
 PARTICIPANT_CHAT_KEY = "participant_chat_in"
 
+# Set LEADERSHIP_CHAT_DEBUG=0 (or false/off) to disable. Log file lives next to this script.
+# For Streamlit Community Cloud (Manage app → Logs): set LEADERSHIP_CHAT_DEBUG_STDERR=1 so the
+# same lines are also written to stderr (Cloud does not expose chat_debug.log on disk).
+_CHAT_DEBUG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chat_debug.log")
+_CHAT_DEBUG_LOGGER = logging.getLogger("leadership_chat_debug")
+
+
+def _chat_debug_log(fmt: str, *args: object) -> None:
+    v = os.environ.get("LEADERSHIP_CHAT_DEBUG", "1").strip().lower()
+    if v in {"0", "false", "no", "off"}:
+        return
+    if not _CHAT_DEBUG_LOGGER.handlers:
+        _CHAT_DEBUG_LOGGER.setLevel(logging.INFO)
+        formatter = logging.Formatter(
+            "%(asctime)s %(levelname)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+        )
+        h = RotatingFileHandler(
+            _CHAT_DEBUG_FILE,
+            maxBytes=1_500_000,
+            backupCount=3,
+            encoding="utf-8",
+        )
+        h.setFormatter(formatter)
+        _CHAT_DEBUG_LOGGER.addHandler(h)
+        se = os.environ.get("LEADERSHIP_CHAT_DEBUG_STDERR", "0").strip().lower()
+        if se in {"1", "true", "yes", "on"}:
+            sh = logging.StreamHandler(sys.stderr)
+            sh.setFormatter(formatter)
+            _CHAT_DEBUG_LOGGER.addHandler(sh)
+        _CHAT_DEBUG_LOGGER.propagate = False
+    _CHAT_DEBUG_LOGGER.info(fmt, *args)
+
 # WhatsApp-Web–style peer row: pastel avatar, coloured display name
 _SPEAKER_CHAT_STYLE: dict[str, dict[str, str]] = {
     "Zoe": {"avatar_bg": "#cfefff", "avatar_fg": "#075e54", "name": "#0284c7"},
@@ -119,6 +153,17 @@ _SPEAKER_CHAT_STYLE: dict[str, dict[str, str]] = {
     "Hao": {"avatar_bg": "#d8f5e3", "avatar_fg": "#075e54", "name": "#128c7e"},
 }
 _DEFAULT_PEER_STYLE = {"avatar_bg": "#e1e8e4", "avatar_fg": "#54656f", "name": "#54656f"}
+
+
+def _embed_chat_iframe(html_doc: str, height_px: int) -> None:
+    """Embed full HTML chat doc. Prefer ``st.iframe`` (Streamlit ≥ ~1.30); fall back to ``components.html``."""
+    iframe_fn = getattr(st, "iframe", None)
+    if callable(iframe_fn):
+        iframe_fn(html_doc, height=height_px, width="stretch")
+        return
+    import streamlit.components.v1 as components
+
+    components.html(html_doc, height=height_px, scrolling=False)
 
 
 def _team_chat_message_html(
@@ -725,6 +770,13 @@ div[data-testid="stChatInputContainer"] textarea {
 # Participant composer: run before chat_messages_panel(). Streamlit still pins chat_input to the
 # bottom of the page; processing here ensures submits are not skipped when the fragment calls st.rerun().
 if prompt := st.chat_input("Type a message", key=PARTICIPANT_CHAT_KEY):
+    _pre = len(st.session_state.messages)
+    _chat_debug_log(
+        "participant_submit len=%s msgs_before=%s preview=%r",
+        len(prompt),
+        _pre,
+        (prompt[:160] + "…") if len(prompt) > 160 else prompt,
+    )
     st.session_state.messages.append({
         "speaker": "Participant",
         "text": prompt,
@@ -736,6 +788,10 @@ if prompt := st.chat_input("Type a message", key=PARTICIPANT_CHAT_KEY):
     if st.session_state.sim_active:
         st.session_state.next_ai_time = time.time() + random.uniform(*HUMAN_REPLY_DELAY_RANGE)
         st.session_state.ai_burst_remaining = random.randint(3, 5)
+    _chat_debug_log(
+        "participant_appended msgs_after=%s rerun=app",
+        len(st.session_state.messages),
+    )
     st.rerun()
 
 # ==========================================
@@ -743,20 +799,27 @@ if prompt := st.chat_input("Type a message", key=PARTICIPANT_CHAT_KEY):
 # ==========================================
 @st.fragment(run_every=FRAGMENT_REFRESH_SEC)
 def chat_messages_panel():
+    _chat_debug_log(
+        "fragment_enter sim=%s n_msg=%s pending=%s next_ai=%.3f now=%.3f",
+        st.session_state.sim_active,
+        len(st.session_state.messages),
+        st.session_state.get("pending_bot_turn") is not None,
+        float(st.session_state.get("next_ai_time", 0.0)),
+        time.time(),
+    )
     feed_h = max(120, CHAT_SCROLL_HEIGHT_PX - 72)
     _force_scroll = bool(st.session_state.get("force_scroll_to_bottom_once", False))
     if _force_scroll:
         st.session_state.force_scroll_to_bottom_once = False
 
-    components.html(
+    _embed_chat_iframe(
         _team_chat_iframe_doc(
             st.session_state.messages,
             participant_id,
             feed_h,
             force_scroll_to_bottom=_force_scroll,
         ),
-        height=CHAT_SCROLL_HEIGHT_PX + 4,
-        scrolling=False,
+        CHAT_SCROLL_HEIGHT_PX + 4,
     )
 
     if not st.session_state.sim_active and not st.session_state.messages:
@@ -765,6 +828,7 @@ def chat_messages_panel():
         st.caption("Simulation **stopped** — transcript above. Click ▶ START to resume AI.")
 
     if not st.session_state.sim_active:
+        _chat_debug_log("fragment_return reason=sim_inactive")
         return
 
     now = time.time()
@@ -783,13 +847,25 @@ def chat_messages_panel():
             st.caption(f"{speaker} is typing…")
 
         if now < ready_at:
+            _chat_debug_log(
+                "fragment_return reason=pending_typing_wait speaker=%s ready_at=%.3f",
+                speaker,
+                ready_at,
+            )
             return
 
         ok = run_agent_turn(speaker, extra_instruction=extra_instruction)
         st.session_state.pending_bot_turn = None
         if not ok:
             st.session_state.next_ai_time = time.time() + 4.0
+            _chat_debug_log("fragment_return reason=agent_failed speaker=%s", speaker)
             return
+
+        _chat_debug_log(
+            "fragment_bot_posted speaker=%s n_msg=%s",
+            speaker,
+            len(st.session_state.messages),
+        )
 
         if used_contribution_nudge:
             st.session_state.last_contribution_nudge_at_ai_count = sum(
@@ -814,6 +890,7 @@ def chat_messages_panel():
             st.session_state.next_ai_time = time.time() + random.uniform(idle_lo, idle_hi)
             st.session_state.ai_burst_remaining = random.randint(1, 3)
 
+        _chat_debug_log("fragment_rerun reason=after_bot_post")
         st.rerun()
 
     if now >= st.session_state.next_ai_time:
@@ -887,14 +964,21 @@ def chat_messages_panel():
         lo, hi = parse_typing_delay(str(td_raw), cfg.typing_delay)
         type_sec = random.uniform(lo, hi)
 
+        _ready_at = time.time() + think_sec + type_sec
         st.session_state.pending_bot_turn = {
             "speaker": speaker,
             "extra_instruction": extra_instruction,
             "used_contribution_nudge": used_contribution_nudge,
-            "ready_at": time.time() + think_sec + type_sec,
+            "ready_at": _ready_at,
         }
         # Keep fragment alive; next run will post when ready_at has passed.
         st.session_state.next_ai_time = time.time() + 0.05
+        _chat_debug_log(
+            "fragment_schedule_pending speaker=%s delay_s=%.3f ready_at=%.3f rerun=app",
+            speaker,
+            think_sec + type_sec,
+            _ready_at,
+        )
         st.rerun()
 
 
