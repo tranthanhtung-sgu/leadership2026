@@ -719,7 +719,7 @@ div[data-testid="stChatInputContainer"] textarea {
 )
 
 # ==========================================
-# 7. ASYNC CHAT UI (fragment timer; chat_input runs before AI work in the fragment)
+# 7. ASYNC CHAT UI (fragment timer for transcript + bots; chat_input stays outside fragment)
 # ==========================================
 @st.fragment(run_every=FRAGMENT_REFRESH_SEC)
 def chat_messages_panel():
@@ -743,25 +743,6 @@ def chat_messages_panel():
         st.caption("Simulation not started. Use ▶ START in the sidebar.")
     elif not st.session_state.sim_active and st.session_state.messages:
         st.caption("Simulation **stopped** — transcript above. Click ▶ START to resume AI.")
-
-    # Process participant input before any think/typing/API so the message shows on the next rerun
-    # without waiting for the current bot turn to finish.
-    if prompt := st.chat_input("Type a message"):
-        st.session_state.messages.append({
-            "speaker": "Participant",
-            "text": prompt,
-            "timestamp": datetime.now().strftime("%H:%M:%S"),
-        })
-        st.session_state.bot_turns_since_human = 0
-        # If a bot was mid "typing", cancel it so the next bot reply can react to the new human line.
-        st.session_state.pending_bot_turn = None
-        # Always jump chat feed to latest line when Participant sends.
-        st.session_state.force_scroll_to_bottom_once = True
-        if st.session_state.sim_active:
-            st.session_state.next_ai_time = time.time() + random.uniform(*HUMAN_REPLY_DELAY_RANGE)
-            # Let several bots respond in quick succession so the human isn’t dropped after one reply
-            st.session_state.ai_burst_remaining = random.randint(3, 5)
-        st.rerun()
 
     if not st.session_state.sim_active:
         return
@@ -898,3 +879,18 @@ def chat_messages_panel():
 
 
 chat_messages_panel()
+
+# Keep chat_input outside the timed fragment so fragment reruns do not remount it (that was clearing drafts mid-typing).
+if prompt := st.chat_input("Type a message"):
+    st.session_state.messages.append({
+        "speaker": "Participant",
+        "text": prompt,
+        "timestamp": datetime.now().strftime("%H:%M:%S"),
+    })
+    st.session_state.bot_turns_since_human = 0
+    st.session_state.pending_bot_turn = None
+    st.session_state.force_scroll_to_bottom_once = True
+    if st.session_state.sim_active:
+        st.session_state.next_ai_time = time.time() + random.uniform(*HUMAN_REPLY_DELAY_RANGE)
+        st.session_state.ai_burst_remaining = random.randint(3, 5)
+    st.rerun()
