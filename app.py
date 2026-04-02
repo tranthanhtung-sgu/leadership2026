@@ -114,6 +114,8 @@ CHAT_SCROLL_HEIGHT_PX = 560
 # Stable widget id so chat_input is not recreated; must be processed before the timed fragment
 # (fragment may call st.rerun(), which would skip any code below it in the same run).
 PARTICIPANT_CHAT_KEY = "participant_chat_in"
+# Drop repeat submits of the same text within this many seconds (double-Enter / chatter).
+PARTICIPANT_SUBMIT_DEBOUNCE_SEC = 2.0
 
 # Set LEADERSHIP_CHAT_DEBUG=0 (or false/off) to disable.
 # (1) In-memory ring buffer in session_state — works on Streamlit Cloud.
@@ -738,13 +740,16 @@ if col_stop.button("⏸ STOP"):
     st.session_state.sim_active = False
     st.session_state.next_ai_time = 0.0
     st.session_state.ai_burst_remaining = 0
+    st.session_state.pending_bot_turn = None
     st.rerun()
 if col_reset.button("⏹ RESET"):
     st.session_state.sim_active = False
     st.session_state.messages = []
     st.session_state.next_ai_time = 0.0
     st.session_state.ai_burst_remaining = 0
+    st.session_state.pending_bot_turn = None
     st.session_state.api_count = 0
+    st.session_state.pop("_last_participant_submit", None)
     st.session_state.bot_turns_since_human = 0
     st.session_state.last_contribution_nudge_at_ai_count = -10_000
     st.rerun()
@@ -838,17 +843,38 @@ div[data-testid="stChatInputContainer"] textarea {
 
 # Participant composer: run before chat_messages_panel(). Streamlit still pins chat_input to the
 # bottom of the page; processing here ensures submits are not skipped when the fragment calls st.rerun().
-if prompt := st.chat_input("Type a message", key=PARTICIPANT_CHAT_KEY):
+if prompt := st.chat_input(
+    "Type a message",
+    key=PARTICIPANT_CHAT_KEY,
+    help="Enter or the arrow button sends. If Enter fires twice quickly, only one line is kept.",
+):
+    _pt = (prompt or "").strip()
+    if not _pt:
+        st.rerun()
+    _now_m = time.monotonic()
+    _prev = st.session_state.get("_last_participant_submit")
+    if (
+        _prev is not None
+        and _prev[0] == _pt
+        and (_now_m - float(_prev[1])) < PARTICIPANT_SUBMIT_DEBOUNCE_SEC
+    ):
+        _chat_debug_log(
+            "participant_submit_ignored_duplicate preview=%r delta_s=%.3f",
+            (_pt[:160] + "…") if len(_pt) > 160 else _pt,
+            _now_m - float(_prev[1]),
+        )
+        st.rerun()
+    st.session_state._last_participant_submit = (_pt, float(_now_m))
     _pre = len(st.session_state.messages)
     _chat_debug_log(
         "participant_submit len=%s msgs_before=%s preview=%r",
-        len(prompt),
+        len(_pt),
         _pre,
-        (prompt[:160] + "…") if len(prompt) > 160 else prompt,
+        (_pt[:160] + "…") if len(_pt) > 160 else _pt,
     )
     st.session_state.messages.append({
         "speaker": "Participant",
-        "text": prompt,
+        "text": _pt,
         "timestamp": datetime.now().strftime("%H:%M:%S"),
     })
     st.session_state.bot_turns_since_human = 0
@@ -897,6 +923,9 @@ def chat_messages_panel():
         st.caption("Simulation **stopped** — transcript above. Click ▶ START to resume AI.")
 
     if not st.session_state.sim_active:
+        if st.session_state.get("pending_bot_turn") is not None:
+            st.session_state.pending_bot_turn = None
+            _chat_debug_log("fragment_clear_pending reason=sim_inactive")
         _chat_debug_log("fragment_return reason=sim_inactive")
         return
 
