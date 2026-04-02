@@ -108,6 +108,10 @@ POST_HUMAN_BOT_WINDOW = 5
 # Scroll this area only; keeps the participant chat box from being pushed off-screen.
 CHAT_SCROLL_HEIGHT_PX = 560
 
+# Stable widget id so chat_input is not recreated; must be processed before the timed fragment
+# (fragment may call st.rerun(), which would skip any code below it in the same run).
+PARTICIPANT_CHAT_KEY = "participant_chat_in"
+
 # WhatsApp-Web–style peer row: pastel avatar, coloured display name
 _SPEAKER_CHAT_STYLE: dict[str, dict[str, str]] = {
     "Zoe": {"avatar_bg": "#cfefff", "avatar_fg": "#075e54", "name": "#0284c7"},
@@ -718,6 +722,22 @@ div[data-testid="stChatInputContainer"] textarea {
     unsafe_allow_html=True,
 )
 
+# Participant composer: run before chat_messages_panel(). Streamlit still pins chat_input to the
+# bottom of the page; processing here ensures submits are not skipped when the fragment calls st.rerun().
+if prompt := st.chat_input("Type a message", key=PARTICIPANT_CHAT_KEY):
+    st.session_state.messages.append({
+        "speaker": "Participant",
+        "text": prompt,
+        "timestamp": datetime.now().strftime("%H:%M:%S"),
+    })
+    st.session_state.bot_turns_since_human = 0
+    st.session_state.pending_bot_turn = None
+    st.session_state.force_scroll_to_bottom_once = True
+    if st.session_state.sim_active:
+        st.session_state.next_ai_time = time.time() + random.uniform(*HUMAN_REPLY_DELAY_RANGE)
+        st.session_state.ai_burst_remaining = random.randint(3, 5)
+    st.rerun()
+
 # ==========================================
 # 7. ASYNC CHAT UI (fragment timer for transcript + bots; chat_input stays outside fragment)
 # ==========================================
@@ -879,18 +899,3 @@ def chat_messages_panel():
 
 
 chat_messages_panel()
-
-# Keep chat_input outside the timed fragment so fragment reruns do not remount it (that was clearing drafts mid-typing).
-if prompt := st.chat_input("Type a message"):
-    st.session_state.messages.append({
-        "speaker": "Participant",
-        "text": prompt,
-        "timestamp": datetime.now().strftime("%H:%M:%S"),
-    })
-    st.session_state.bot_turns_since_human = 0
-    st.session_state.pending_bot_turn = None
-    st.session_state.force_scroll_to_bottom_once = True
-    if st.session_state.sim_active:
-        st.session_state.next_ai_time = time.time() + random.uniform(*HUMAN_REPLY_DELAY_RANGE)
-        st.session_state.ai_burst_remaining = random.randint(3, 5)
-    st.rerun()
