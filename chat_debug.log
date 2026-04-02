@@ -1,0 +1,424 @@
+2026-04-02 10:16:25 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775096185.132
+2026-04-02 10:16:25 INFO fragment_return reason=sim_inactive
+2026-04-02 10:16:27 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775096187.005
+2026-04-02 10:16:27 INFO fragment_return reason=sim_inactive
+2026-04-02 10:16:27 INFO fragment_enter sim=True n_msg=0 pending=False next_ai=1775096187.934 now=1775096187.198
+2026-04-02 10:16:28 INFO fragment_enter sim=True n_msg=0 pending=False next_ai=1775096187.934 now=1775096188.500
+2026-04-02 10:16:28 INFO fragment_schedule_pending speaker=Zoe delay_s=1.828 ready_at=1775096190.329 rerun=app
+2026-04-02 10:16:28 INFO fragment_enter sim=True n_msg=0 pending=True next_ai=1775096188.551 now=1775096188.571
+2026-04-02 10:16:28 INFO fragment_return reason=pending_typing_wait speaker=Zoe ready_at=1775096190.329
+2026-04-02 10:16:29 INFO fragment_enter sim=True n_msg=0 pending=True next_ai=1775096188.551 now=1775096189.861
+2026-04-02 10:16:29 INFO fragment_return reason=pending_typing_wait speaker=Zoe ready_at=1775096190.329
+2026-04-02 10:16:31 INFO fragment_enter sim=True n_msg=0 pending=True next_ai=1775096188.551 now=1775096191.051
+2026-04-02 10:16:33 INFO fragment_bot_posted speaker=Zoe n_msg=1
+2026-04-02 10:16:33 INFO fragment_rerun reason=after_bot_post
+2026-04-02 10:16:33 INFO fragment_enter sim=True n_msg=1 pending=False next_ai=1775096196.572 now=1775096193.920
+2026-04-02 10:16:35 INFO participant_submit len=13 msgs_before=1 preview='that is great'
+2026-04-02 10:16:35 INFO participant_appended msgs_after=2 rerun=app
+2026-04-02 10:16:35 INFO fragment_enter sim=True n_msg=2 pending=False next_ai=1775096200.235 now=1775096195.743
+2026-04-02 10:16:36 INFO participant_submit len=13 msgs_before=2 preview='that is great'
+2026-04-02 10:16:36 INFO participant_appended msgs_after=3 rerun=app
+2026-04-02 10:16:36 INFO fragment_enter sim=True n_msg=3 pending=False next_ai=1775096201.299 now=1775096196.800
+2026-04-02 10:16:38 INFO fragment_enter sim=True n_msg=3 pending=False next_ai=1775096201.299 now=1775096198.122
+2026-04-02 10:16:39 INFO fragment_enter sim=True n_msg=3 pending=False next_ai=1775096201.299 now=1775096199.312
+2026-04-02 10:16:40 INFO fragment_enter sim=True n_msg=3 pending=False next_ai=1775096201.299 now=1775096200.520
+2026-04-02 10:16:41 INFO fragment_enter sim=True n_msg=3 pending=False next_ai=1775096201.299 now=1775096201.710
+2026-04-02 10:16:41 INFO fragment_schedule_pending speaker=Femke delay_s=1.368 ready_at=1775096203.080 rerun=app
+2026-04-02 10:16:41 INFO fragment_enter sim=True n_msg=3 pending=True next_ai=1775096201.762 now=1775096201.783
+2026-04-02 10:16:41 INFO fragment_return reason=pending_typing_wait speaker=Femke ready_at=1775096203.080
+2026-04-02 10:16:43 INFO fragment_enter sim=True n_msg=3 pending=True next_ai=1775096201.762 now=1775096203.085
+2026-04-02 10:16:45 INFO fragment_bot_posted speaker=Femke n_msg=4
+2026-04-02 10:16:45 INFO fragment_rerun reason=after_bot_post
+2026-04-02 10:16:45 INFO fragment_enter sim=True n_msg=4 pending=False next_ai=1775096206.636 now=1775096205.617
+2026-04-02 10:16:46 INFO participant_submit len=13 msgs_before=4 preview='that is great'
+2026-04-02 10:16:46 INFO participant_appended msgs_after=5 rerun=app
+2026-04-02 10:16:46 INFO fragment_enter sim=True n_msg=5 pending=False next_ai=1775096211.772 now=1775096206.427
+2026-04-02 10:16:46 INFO participant_submit len=13 msgs_before=5 preview='that is great'
+2026-04-02 10:16:46 INFO participant_appended msgs_after=6 rerun=app
+2026-04-02 10:16:46 INFO fragment_enter sim=True n_msg=6 pending=False next_ai=1775096210.552 now=1775096206.836
+2026-04-02 10:16:48 INFO fragment_enter sim=True n_msg=6 pending=False next_ai=1775096210.552 now=1775096208.170
+2026-04-02 10:16:49 INFO fragment_enter sim=True n_msg=6 pending=False next_ai=1775096210.552 now=1775096209.359
+2026-04-02 10:16:50 INFO fragment_enter sim=True n_msg=6 pending=False next_ai=1775096210.552 now=1775096210.566
+2026-04-02 10:16:50 INFO fragment_schedule_pending speaker=Femke delay_s=1.772 ready_at=1775096212.340 rerun=app
+2026-04-02 10:16:50 INFO fragment_enter sim=True n_msg=6 pending=True next_ai=1775096210.618 now=1775096210.642
+2026-04-02 10:16:50 INFO fragment_return reason=pending_typing_wait speaker=Femke ready_at=1775096212.340
+2026-04-02 10:16:51 INFO fragment_enter sim=True n_msg=6 pending=True next_ai=1775096210.618 now=1775096211.943
+2026-04-02 10:16:51 INFO fragment_return reason=pending_typing_wait speaker=Femke ready_at=1775096212.340
+2026-04-02 10:16:53 INFO fragment_enter sim=True n_msg=6 pending=True next_ai=1775096210.618 now=1775096213.134
+2026-04-02 10:16:54 INFO fragment_bot_posted speaker=Femke n_msg=7
+2026-04-02 10:16:54 INFO fragment_rerun reason=after_bot_post
+2026-04-02 10:16:54 INFO fragment_enter sim=True n_msg=7 pending=False next_ai=1775096216.662 now=1775096214.892
+2026-04-02 10:16:56 INFO participant_submit len=13 msgs_before=7 preview='that is great'
+2026-04-02 10:16:56 INFO participant_appended msgs_after=8 rerun=app
+2026-04-02 10:16:56 INFO fragment_enter sim=True n_msg=8 pending=False next_ai=1775096219.902 now=1775096216.305
+2026-04-02 10:16:56 INFO participant_submit len=13 msgs_before=8 preview='that is great'
+2026-04-02 10:16:56 INFO participant_appended msgs_after=9 rerun=app
+2026-04-02 10:16:56 INFO fragment_enter sim=True n_msg=9 pending=False next_ai=1775096221.396 now=1775096216.760
+2026-04-02 10:16:58 INFO fragment_enter sim=True n_msg=9 pending=False next_ai=1775096221.396 now=1775096218.046
+2026-04-02 10:16:59 INFO fragment_enter sim=True n_msg=9 pending=False next_ai=1775096221.396 now=1775096219.252
+2026-04-02 10:17:00 INFO fragment_enter sim=True n_msg=9 pending=False next_ai=1775096221.396 now=1775096220.444
+2026-04-02 10:17:01 INFO fragment_enter sim=True n_msg=9 pending=False next_ai=1775096221.396 now=1775096221.651
+2026-04-02 10:17:01 INFO fragment_schedule_pending speaker=Femke delay_s=1.116 ready_at=1775096222.768 rerun=app
+2026-04-02 10:17:01 INFO fragment_enter sim=True n_msg=9 pending=True next_ai=1775096221.702 now=1775096221.729
+2026-04-02 10:17:01 INFO fragment_return reason=pending_typing_wait speaker=Femke ready_at=1775096222.768
+2026-04-02 10:17:03 INFO fragment_enter sim=True n_msg=9 pending=True next_ai=1775096221.702 now=1775096223.027
+2026-04-02 10:17:05 INFO participant_submit len=13 msgs_before=9 preview='that is great'
+2026-04-02 10:17:05 INFO participant_appended msgs_after=10 rerun=app
+2026-04-02 10:17:05 INFO fragment_enter sim=True n_msg=10 pending=False next_ai=1775096230.500 now=1775096225.626
+2026-04-02 10:17:06 INFO fragment_enter sim=True n_msg=10 pending=False next_ai=1775096230.500 now=1775096226.921
+2026-04-02 10:17:08 INFO fragment_enter sim=True n_msg=10 pending=False next_ai=1775096230.500 now=1775096228.126
+2026-04-02 10:17:09 INFO fragment_enter sim=True n_msg=10 pending=False next_ai=1775096230.500 now=1775096229.318
+2026-04-02 10:17:10 INFO fragment_enter sim=True n_msg=10 pending=False next_ai=1775096230.500 now=1775096230.524
+2026-04-02 10:17:10 INFO fragment_schedule_pending speaker=Femke delay_s=2.031 ready_at=1775096232.556 rerun=app
+2026-04-02 10:17:10 INFO fragment_enter sim=True n_msg=10 pending=True next_ai=1775096230.575 now=1775096230.604
+2026-04-02 10:17:10 INFO fragment_return reason=pending_typing_wait speaker=Femke ready_at=1775096232.556
+2026-04-02 10:17:11 INFO fragment_enter sim=True n_msg=10 pending=True next_ai=1775096230.575 now=1775096231.901
+2026-04-02 10:17:11 INFO fragment_return reason=pending_typing_wait speaker=Femke ready_at=1775096232.556
+2026-04-02 10:17:13 INFO fragment_enter sim=True n_msg=10 pending=True next_ai=1775096230.575 now=1775096233.090
+2026-04-02 10:17:16 INFO fragment_bot_posted speaker=Femke n_msg=11
+2026-04-02 10:17:16 INFO fragment_rerun reason=after_bot_post
+2026-04-02 10:17:16 INFO fragment_enter sim=True n_msg=11 pending=False next_ai=1775096238.301 now=1775096236.694
+2026-04-02 10:17:17 INFO participant_submit len=13 msgs_before=11 preview='that is great'
+2026-04-02 10:17:17 INFO participant_appended msgs_after=12 rerun=app
+2026-04-02 10:17:17 INFO fragment_enter sim=True n_msg=12 pending=False next_ai=1775096243.001 now=1775096237.343
+2026-04-02 10:17:17 INFO participant_submit len=13 msgs_before=12 preview='that is great'
+2026-04-02 10:17:17 INFO participant_appended msgs_after=13 rerun=app
+2026-04-02 10:17:17 INFO fragment_enter sim=True n_msg=13 pending=False next_ai=1775096242.010 now=1775096237.775
+2026-04-02 10:17:19 INFO fragment_enter sim=True n_msg=13 pending=False next_ai=1775096242.010 now=1775096239.066
+2026-04-02 10:17:20 INFO fragment_enter sim=True n_msg=13 pending=False next_ai=1775096242.010 now=1775096240.266
+2026-04-02 10:17:21 INFO fragment_enter sim=True n_msg=13 pending=False next_ai=1775096242.010 now=1775096241.472
+2026-04-02 10:17:22 INFO fragment_enter sim=True n_msg=13 pending=False next_ai=1775096242.010 now=1775096242.663
+2026-04-02 10:17:22 INFO fragment_schedule_pending speaker=Femke delay_s=1.840 ready_at=1775096244.504 rerun=app
+2026-04-02 10:17:22 INFO fragment_enter sim=True n_msg=13 pending=True next_ai=1775096242.714 now=1775096242.743
+2026-04-02 10:17:22 INFO fragment_return reason=pending_typing_wait speaker=Femke ready_at=1775096244.504
+2026-04-02 10:17:24 INFO fragment_enter sim=True n_msg=13 pending=True next_ai=1775096242.714 now=1775096244.039
+2026-04-02 10:17:24 INFO fragment_return reason=pending_typing_wait speaker=Femke ready_at=1775096244.504
+2026-04-02 10:17:25 INFO fragment_enter sim=True n_msg=13 pending=True next_ai=1775096242.714 now=1775096245.230
+2026-04-02 10:17:26 INFO fragment_bot_posted speaker=Femke n_msg=14
+2026-04-02 10:17:26 INFO fragment_rerun reason=after_bot_post
+2026-04-02 10:17:26 INFO fragment_enter sim=True n_msg=14 pending=False next_ai=1775096248.292 now=1775096246.916
+2026-04-02 10:17:28 INFO fragment_enter sim=True n_msg=14 pending=False next_ai=1775096248.292 now=1775096248.251
+2026-04-02 10:17:29 INFO fragment_enter sim=True n_msg=14 pending=False next_ai=1775096248.292 now=1775096249.411
+2026-04-02 10:17:29 INFO fragment_schedule_pending speaker=Hao delay_s=3.359 ready_at=1775096252.772 rerun=app
+2026-04-02 10:17:29 INFO fragment_enter sim=True n_msg=14 pending=True next_ai=1775096249.463 now=1775096249.490
+2026-04-02 10:17:29 INFO fragment_return reason=pending_typing_wait speaker=Hao ready_at=1775096252.772
+2026-04-02 10:17:30 INFO fragment_enter sim=True n_msg=14 pending=True next_ai=1775096249.463 now=1775096250.789
+2026-04-02 10:17:30 INFO fragment_return reason=pending_typing_wait speaker=Hao ready_at=1775096252.772
+2026-04-02 10:17:31 INFO participant_submit len=13 msgs_before=14 preview='that is great'
+2026-04-02 10:17:31 INFO participant_appended msgs_after=15 rerun=app
+2026-04-02 10:17:31 INFO fragment_enter sim=True n_msg=15 pending=False next_ai=1775096255.184 now=1775096251.484
+2026-04-02 10:17:31 INFO participant_submit len=13 msgs_before=15 preview='that is great'
+2026-04-02 10:17:31 INFO participant_appended msgs_after=16 rerun=app
+2026-04-02 10:17:31 INFO fragment_enter sim=True n_msg=16 pending=False next_ai=1775096254.884 now=1775096251.779
+2026-04-02 10:17:33 INFO fragment_enter sim=True n_msg=16 pending=False next_ai=1775096254.884 now=1775096253.084
+2026-04-02 10:17:34 INFO fragment_enter sim=True n_msg=16 pending=False next_ai=1775096254.884 now=1775096254.290
+2026-04-02 10:17:34 INFO participant_submit len=39 msgs_before=16 preview='that is greatthat is greatthat is great'
+2026-04-02 10:17:34 INFO participant_appended msgs_after=17 rerun=app
+2026-04-02 10:17:35 INFO fragment_enter sim=True n_msg=17 pending=False next_ai=1775096258.283 now=1775096255.025
+2026-04-02 10:17:36 INFO fragment_enter sim=True n_msg=17 pending=False next_ai=1775096258.283 now=1775096256.329
+2026-04-02 10:17:36 INFO participant_submit len=13 msgs_before=17 preview='that is great'
+2026-04-02 10:17:36 INFO participant_appended msgs_after=18 rerun=app
+2026-04-02 10:17:36 INFO fragment_enter sim=True n_msg=18 pending=False next_ai=1775096260.246 now=1775096256.738
+2026-04-02 10:17:37 INFO participant_submit len=13 msgs_before=18 preview='that is great'
+2026-04-02 10:17:37 INFO participant_appended msgs_after=19 rerun=app
+2026-04-02 10:17:37 INFO fragment_enter sim=True n_msg=19 pending=False next_ai=1775096262.372 now=1775096257.518
+2026-04-02 10:17:38 INFO fragment_enter sim=True n_msg=19 pending=False next_ai=1775096262.372 now=1775096258.829
+2026-04-02 10:17:38 INFO participant_submit len=26 msgs_before=19 preview='that is greatthat is great'
+2026-04-02 10:17:38 INFO participant_appended msgs_after=20 rerun=app
+2026-04-02 10:17:38 INFO fragment_enter sim=True n_msg=20 pending=False next_ai=1775096264.893 now=1775096258.987
+2026-04-02 10:17:40 INFO fragment_enter sim=True n_msg=20 pending=False next_ai=1775096264.893 now=1775096260.274
+2026-04-02 10:17:41 INFO fragment_enter sim=True n_msg=20 pending=False next_ai=1775096264.893 now=1775096261.481
+2026-04-02 10:17:42 INFO participant_submit len=1 msgs_before=20 preview='?'
+2026-04-02 10:17:42 INFO participant_appended msgs_after=21 rerun=app
+2026-04-02 10:17:42 INFO fragment_enter sim=True n_msg=21 pending=False next_ai=1775096266.607 now=1775096262.309
+2026-04-02 10:17:43 INFO participant_submit len=5 msgs_before=21 preview='whatf'
+2026-04-02 10:17:43 INFO participant_appended msgs_after=22 rerun=app
+2026-04-02 10:17:43 INFO fragment_enter sim=True n_msg=22 pending=False next_ai=1775096266.462 now=1775096263.155
+2026-04-02 10:17:44 INFO fragment_enter sim=True n_msg=22 pending=False next_ai=1775096266.462 now=1775096264.438
+2026-04-02 10:17:45 INFO participant_submit len=8 msgs_before=22 preview='no whati'
+2026-04-02 10:17:45 INFO participant_appended msgs_after=23 rerun=app
+2026-04-02 10:17:45 INFO fragment_enter sim=True n_msg=23 pending=False next_ai=1775096269.347 now=1775096265.443
+2026-04-02 10:17:46 INFO participant_submit len=9 msgs_before=23 preview="sdhuaihd'"
+2026-04-02 10:17:46 INFO participant_appended msgs_after=24 rerun=app
+2026-04-02 10:17:46 INFO fragment_enter sim=True n_msg=24 pending=False next_ai=1775096269.974 now=1775096266.750
+2026-04-02 10:17:47 INFO participant_submit len=6 msgs_before=24 preview='dfgdfg'
+2026-04-02 10:17:47 INFO participant_appended msgs_after=25 rerun=app
+2026-04-02 10:17:47 INFO fragment_enter sim=True n_msg=25 pending=False next_ai=1775096271.789 now=1775096267.552
+2026-04-02 10:17:48 INFO fragment_enter sim=True n_msg=25 pending=False next_ai=1775096271.789 now=1775096268.843
+2026-04-02 10:17:50 INFO fragment_enter sim=True n_msg=25 pending=False next_ai=1775096271.789 now=1775096270.049
+2026-04-02 10:17:51 INFO fragment_enter sim=True n_msg=25 pending=False next_ai=1775096271.789 now=1775096271.256
+2026-04-02 10:17:52 INFO fragment_enter sim=True n_msg=25 pending=False next_ai=1775096271.789 now=1775096272.445
+2026-04-02 10:17:52 INFO fragment_schedule_pending speaker=Hao delay_s=1.951 ready_at=1775096274.396 rerun=app
+2026-04-02 10:17:52 INFO fragment_enter sim=True n_msg=25 pending=True next_ai=1775096272.495 now=1775096272.518
+2026-04-02 10:17:52 INFO fragment_return reason=pending_typing_wait speaker=Hao ready_at=1775096274.396
+2026-04-02 10:17:53 INFO fragment_enter sim=True n_msg=25 pending=True next_ai=1775096272.495 now=1775096273.806
+2026-04-02 10:17:53 INFO fragment_return reason=pending_typing_wait speaker=Hao ready_at=1775096274.396
+2026-04-02 10:17:55 INFO fragment_enter sim=True n_msg=25 pending=True next_ai=1775096272.495 now=1775096275.013
+2026-04-02 10:17:57 INFO fragment_bot_posted speaker=Hao n_msg=26
+2026-04-02 10:17:57 INFO fragment_rerun reason=after_bot_post
+2026-04-02 10:17:57 INFO fragment_enter sim=True n_msg=26 pending=False next_ai=1775096280.267 now=1775096277.456
+2026-04-02 10:17:57 INFO fragment_enter sim=True n_msg=26 pending=False next_ai=1775096280.267 now=1775096277.514
+2026-04-02 10:17:58 INFO fragment_enter sim=True n_msg=26 pending=False next_ai=1775096280.267 now=1775096278.805
+2026-04-02 10:17:59 INFO fragment_enter sim=True n_msg=26 pending=False next_ai=1775096280.267 now=1775096279.996
+2026-04-02 10:18:00 INFO participant_submit len=10 msgs_before=26 preview='dont kn ow'
+2026-04-02 10:18:00 INFO participant_appended msgs_after=27 rerun=app
+2026-04-02 10:18:00 INFO fragment_enter sim=True n_msg=27 pending=False next_ai=1775096283.577 now=1775096280.220
+2026-04-02 10:18:01 INFO fragment_enter sim=True n_msg=27 pending=False next_ai=1775096283.577 now=1775096281.508
+2026-04-02 10:18:01 INFO participant_submit len=10 msgs_before=27 preview='dont kn ow'
+2026-04-02 10:18:01 INFO participant_appended msgs_after=28 rerun=app
+2026-04-02 10:18:01 INFO fragment_enter sim=True n_msg=28 pending=False next_ai=1775096286.333 now=1775096281.778
+2026-04-02 10:18:03 INFO participant_submit len=3 msgs_before=28 preview='yes'
+2026-04-02 10:18:03 INFO participant_appended msgs_after=29 rerun=app
+2026-04-02 10:18:03 INFO fragment_enter sim=True n_msg=29 pending=False next_ai=1775096286.328 now=1775096283.142
+2026-04-02 10:18:03 INFO participant_submit len=3 msgs_before=29 preview='yes'
+2026-04-02 10:18:03 INFO participant_appended msgs_after=30 rerun=app
+2026-04-02 10:18:03 INFO fragment_enter sim=True n_msg=30 pending=False next_ai=1775096289.495 now=1775096283.710
+2026-04-02 10:18:05 INFO fragment_enter sim=True n_msg=30 pending=False next_ai=1775096289.495 now=1775096285.008
+2026-04-02 10:18:06 INFO fragment_enter sim=True n_msg=30 pending=False next_ai=1775096289.495 now=1775096286.216
+2026-04-02 10:34:10 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097250.087
+2026-04-02 10:34:11 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097251.323
+2026-04-02 10:34:12 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097252.529
+2026-04-02 10:34:17 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097257.716
+2026-04-02 10:34:19 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097259.009
+2026-04-02 10:34:20 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097260.216
+2026-04-02 10:34:21 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097261.407
+2026-04-02 10:34:22 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097262.614
+2026-04-02 10:34:23 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097263.804
+2026-04-02 10:34:25 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097265.243
+2026-04-02 10:34:26 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097266.250
+2026-04-02 10:34:28 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097268.250
+2026-04-02 10:34:29 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097269.242
+2026-04-02 10:34:30 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097270.250
+2026-04-02 10:34:31 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097271.240
+2026-04-02 10:34:32 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097272.247
+2026-04-02 10:34:34 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097274.245
+2026-04-02 10:34:35 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097275.237
+2026-04-02 10:34:36 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097276.247
+2026-04-02 10:34:37 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097277.248
+2026-04-02 10:34:38 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097278.250
+2026-04-02 10:34:40 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097280.245
+2026-04-02 10:34:41 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097281.249
+2026-04-02 10:34:42 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097282.241
+2026-04-02 10:34:43 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097283.247
+2026-04-02 10:34:44 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097284.241
+2026-04-02 10:34:46 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097286.262
+2026-04-02 10:34:47 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097287.238
+2026-04-02 10:34:48 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097288.244
+2026-04-02 10:34:49 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097289.246
+2026-04-02 10:34:50 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097290.243
+2026-04-02 10:34:52 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097292.240
+2026-04-02 10:34:53 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097293.245
+2026-04-02 10:34:54 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097294.237
+2026-04-02 10:34:55 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097295.243
+2026-04-02 10:34:56 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097296.250
+2026-04-02 10:34:58 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097298.247
+2026-04-02 10:34:59 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097299.237
+2026-04-02 10:35:00 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097300.247
+2026-04-02 10:35:01 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097301.238
+2026-04-02 10:35:02 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097302.239
+2026-04-02 10:35:04 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097304.240
+2026-04-02 10:35:05 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097305.246
+2026-04-02 10:35:06 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097306.241
+2026-04-02 10:35:07 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097307.237
+2026-04-02 10:35:08 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097308.246
+2026-04-02 10:35:10 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097310.210
+2026-04-02 10:35:10 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097310.604
+2026-04-02 10:35:11 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097311.810
+2026-04-02 10:35:20 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097320.561
+2026-04-02 10:35:20 INFO fragment_return reason=sim_inactive
+2026-04-02 10:35:21 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097321.836
+2026-04-02 10:35:21 INFO fragment_return reason=sim_inactive
+2026-04-02 10:35:23 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097323.043
+2026-04-02 10:35:23 INFO fragment_return reason=sim_inactive
+2026-04-02 10:35:23 INFO fragment_enter sim=True n_msg=0 pending=False next_ai=1775097324.578 now=1775097323.836
+2026-04-02 10:35:25 INFO fragment_enter sim=True n_msg=0 pending=False next_ai=1775097324.578 now=1775097325.116
+2026-04-02 10:35:25 INFO fragment_schedule_pending speaker=Zoe delay_s=3.076 ready_at=1775097328.195 rerun=app
+2026-04-02 10:35:25 INFO fragment_enter sim=True n_msg=0 pending=True next_ai=1775097325.168 now=1775097325.192
+2026-04-02 10:35:25 INFO fragment_return reason=pending_typing_wait speaker=Zoe ready_at=1775097328.195
+2026-04-02 10:35:26 INFO fragment_enter sim=True n_msg=0 pending=True next_ai=1775097325.168 now=1775097326.477
+2026-04-02 10:35:26 INFO fragment_return reason=pending_typing_wait speaker=Zoe ready_at=1775097328.195
+2026-04-02 10:35:27 INFO fragment_enter sim=True n_msg=0 pending=True next_ai=1775097325.168 now=1775097327.684
+2026-04-02 10:35:27 INFO fragment_return reason=pending_typing_wait speaker=Zoe ready_at=1775097328.195
+2026-04-02 10:35:28 INFO fragment_enter sim=True n_msg=0 pending=True next_ai=1775097325.168 now=1775097328.874
+2026-04-02 10:35:31 INFO fragment_bot_posted speaker=Zoe n_msg=1
+2026-04-02 10:35:31 INFO fragment_rerun reason=after_bot_post
+2026-04-02 10:35:32 INFO fragment_enter sim=True n_msg=1 pending=False next_ai=1775097334.213 now=1775097332.004
+2026-04-02 10:35:32 INFO fragment_enter sim=True n_msg=1 pending=False next_ai=1775097334.213 now=1775097332.717
+2026-04-02 10:35:34 INFO fragment_enter sim=True n_msg=1 pending=False next_ai=1775097334.213 now=1775097334.026
+2026-04-02 10:35:34 INFO participant_submit len=7 msgs_before=1 preview='what ??'
+2026-04-02 10:35:34 INFO participant_appended msgs_after=2 rerun=app
+2026-04-02 10:35:35 INFO fragment_enter sim=True n_msg=2 pending=False next_ai=1775097340.868 now=1775097335.078
+2026-04-02 10:35:35 INFO participant_submit len=7 msgs_before=2 preview='what ??'
+2026-04-02 10:35:35 INFO participant_appended msgs_after=3 rerun=app
+2026-04-02 10:35:35 INFO fragment_enter sim=True n_msg=3 pending=False next_ai=1775097341.046 now=1775097335.953
+2026-04-02 10:35:36 INFO participant_submit len=7 msgs_before=3 preview='what ??'
+2026-04-02 10:35:36 INFO participant_appended msgs_after=4 rerun=app
+2026-04-02 10:35:36 INFO fragment_enter sim=True n_msg=4 pending=False next_ai=1775097341.025 now=1775097336.304
+2026-04-02 10:35:36 INFO participant_submit len=7 msgs_before=4 preview='what ??'
+2026-04-02 10:35:36 INFO participant_appended msgs_after=5 rerun=app
+2026-04-02 10:35:36 INFO fragment_enter sim=True n_msg=5 pending=False next_ai=1775097340.002 now=1775097336.598
+2026-04-02 10:35:37 INFO participant_submit len=7 msgs_before=5 preview='what ??'
+2026-04-02 10:35:37 INFO participant_appended msgs_after=6 rerun=app
+2026-04-02 10:35:37 INFO fragment_enter sim=True n_msg=6 pending=False next_ai=1775097342.379 now=1775097337.306
+2026-04-02 10:35:37 INFO participant_submit len=7 msgs_before=6 preview='what ??'
+2026-04-02 10:35:37 INFO participant_appended msgs_after=7 rerun=app
+2026-04-02 10:35:37 INFO fragment_enter sim=True n_msg=7 pending=False next_ai=1775097341.792 now=1775097337.599
+2026-04-02 10:35:37 INFO participant_submit len=7 msgs_before=7 preview='what ??'
+2026-04-02 10:35:37 INFO participant_appended msgs_after=8 rerun=app
+2026-04-02 10:35:37 INFO fragment_enter sim=True n_msg=8 pending=False next_ai=1775097341.096 now=1775097337.850
+2026-04-02 10:35:39 INFO fragment_enter sim=True n_msg=8 pending=False next_ai=1775097341.096 now=1775097339.142
+2026-04-02 10:35:39 INFO participant_submit len=13 msgs_before=8 preview='what is that '
+2026-04-02 10:35:39 INFO participant_appended msgs_after=9 rerun=app
+2026-04-02 10:35:40 INFO fragment_enter sim=True n_msg=9 pending=False next_ai=1775097344.112 now=1775097340.021
+2026-04-02 10:35:41 INFO participant_submit len=7 msgs_before=9 preview='what ??'
+2026-04-02 10:35:41 INFO participant_appended msgs_after=10 rerun=app
+2026-04-02 10:35:41 INFO fragment_enter sim=True n_msg=10 pending=False next_ai=1775097344.798 now=1775097341.158
+2026-04-02 10:35:41 INFO participant_submit len=7 msgs_before=10 preview='what ??'
+2026-04-02 10:35:41 INFO participant_appended msgs_after=11 rerun=app
+2026-04-02 10:35:41 INFO fragment_enter sim=True n_msg=11 pending=False next_ai=1775097344.478 now=1775097341.425
+2026-04-02 10:35:41 INFO participant_submit len=7 msgs_before=11 preview='what ??'
+2026-04-02 10:35:41 INFO participant_appended msgs_after=12 rerun=app
+2026-04-02 10:35:41 INFO fragment_enter sim=True n_msg=12 pending=False next_ai=1775097346.638 now=1775097341.644
+2026-04-02 10:35:42 INFO fragment_enter sim=True n_msg=12 pending=False next_ai=1775097346.638 now=1775097342.949
+2026-04-02 10:35:44 INFO fragment_enter sim=True n_msg=12 pending=False next_ai=1775097346.638 now=1775097344.142
+2026-04-02 10:35:45 INFO fragment_enter sim=True n_msg=12 pending=False next_ai=1775097346.638 now=1775097345.347
+2026-04-02 10:35:46 INFO fragment_enter sim=True n_msg=12 pending=False next_ai=1775097346.638 now=1775097346.554
+2026-04-02 10:35:48 INFO fragment_enter sim=True n_msg=12 pending=False next_ai=1775097346.638 now=1775097348.250
+2026-04-02 10:35:48 INFO fragment_schedule_pending speaker=Zoe delay_s=2.109 ready_at=1775097350.361 rerun=app
+2026-04-02 10:35:48 INFO fragment_enter sim=True n_msg=12 pending=True next_ai=1775097348.302 now=1775097348.325
+2026-04-02 10:35:48 INFO fragment_return reason=pending_typing_wait speaker=Zoe ready_at=1775097350.361
+2026-04-02 10:35:50 INFO fragment_enter sim=True n_msg=12 pending=True next_ai=1775097348.302 now=1775097350.247
+2026-04-02 10:35:50 INFO fragment_return reason=pending_typing_wait speaker=Zoe ready_at=1775097350.361
+2026-04-02 10:35:51 INFO fragment_enter sim=True n_msg=12 pending=True next_ai=1775097348.302 now=1775097351.237
+2026-04-02 10:35:53 INFO fragment_bot_posted speaker=Zoe n_msg=13
+2026-04-02 10:35:53 INFO fragment_rerun reason=after_bot_post
+2026-04-02 10:35:53 INFO fragment_enter sim=True n_msg=13 pending=False next_ai=1775097355.951 now=1775097353.520
+2026-04-02 10:35:55 INFO fragment_enter sim=True n_msg=13 pending=False next_ai=1775097355.951 now=1775097355.243
+2026-04-02 10:35:56 INFO fragment_enter sim=True n_msg=13 pending=False next_ai=1775097355.951 now=1775097356.238
+2026-04-02 10:35:56 INFO fragment_schedule_pending speaker=Femke delay_s=2.053 ready_at=1775097358.292 rerun=app
+2026-04-02 10:35:56 INFO fragment_enter sim=True n_msg=13 pending=True next_ai=1775097356.290 now=1775097356.314
+2026-04-02 10:35:56 INFO fragment_return reason=pending_typing_wait speaker=Femke ready_at=1775097358.292
+2026-04-02 10:35:58 INFO fragment_enter sim=True n_msg=13 pending=True next_ai=1775097356.290 now=1775097358.247
+2026-04-02 10:35:58 INFO fragment_return reason=pending_typing_wait speaker=Femke ready_at=1775097358.292
+2026-04-02 10:35:59 INFO fragment_enter sim=True n_msg=13 pending=True next_ai=1775097356.290 now=1775097359.248
+2026-04-02 10:36:04 INFO participant_submit len=4 msgs_before=13 preview='okay'
+2026-04-02 10:36:04 INFO participant_appended msgs_after=14 rerun=app
+2026-04-02 10:36:04 INFO fragment_enter sim=True n_msg=14 pending=False next_ai=1775097369.843 now=1775097364.683
+2026-04-02 10:36:06 INFO fragment_enter sim=True n_msg=14 pending=False next_ai=1775097369.843 now=1775097366.247
+2026-04-02 10:36:07 INFO fragment_enter sim=True n_msg=14 pending=False next_ai=1775097369.843 now=1775097367.242
+2026-04-02 10:36:15 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097375.761
+2026-04-02 10:36:15 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:18 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097378.008
+2026-04-02 10:36:18 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:18 INFO fragment_enter sim=False n_msg=0 pending=False next_ai=0.000 now=1775097378.810
+2026-04-02 10:36:18 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:19 INFO participant_submit len=4 msgs_before=0 preview='what'
+2026-04-02 10:36:19 INFO participant_appended msgs_after=1 rerun=app
+2026-04-02 10:36:19 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097379.469
+2026-04-02 10:36:19 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:20 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097380.764
+2026-04-02 10:36:20 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:22 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097382.243
+2026-04-02 10:36:22 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:23 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097383.244
+2026-04-02 10:36:23 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:25 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097385.245
+2026-04-02 10:36:25 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:26 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097386.238
+2026-04-02 10:36:26 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:27 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097387.241
+2026-04-02 10:36:27 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:28 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097388.246
+2026-04-02 10:36:28 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:29 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097389.241
+2026-04-02 10:36:29 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:31 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097391.250
+2026-04-02 10:36:31 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:32 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097392.249
+2026-04-02 10:36:32 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:33 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097393.241
+2026-04-02 10:36:33 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:34 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097394.239
+2026-04-02 10:36:34 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:35 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097395.246
+2026-04-02 10:36:35 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:37 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097397.246
+2026-04-02 10:36:37 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:38 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097398.249
+2026-04-02 10:36:38 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:39 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097399.249
+2026-04-02 10:36:39 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:40 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097400.241
+2026-04-02 10:36:40 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:41 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097401.250
+2026-04-02 10:36:41 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:43 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097403.240
+2026-04-02 10:36:43 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:44 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097404.246
+2026-04-02 10:36:44 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:45 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097405.236
+2026-04-02 10:36:45 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:46 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097406.241
+2026-04-02 10:36:46 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:47 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097407.244
+2026-04-02 10:36:47 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:49 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097409.245
+2026-04-02 10:36:49 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:50 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097410.249
+2026-04-02 10:36:50 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:51 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097411.239
+2026-04-02 10:36:51 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:52 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097412.243
+2026-04-02 10:36:52 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:53 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097413.252
+2026-04-02 10:36:53 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:55 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097415.251
+2026-04-02 10:36:55 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:56 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097416.240
+2026-04-02 10:36:56 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:57 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097417.244
+2026-04-02 10:36:57 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:58 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097418.251
+2026-04-02 10:36:58 INFO fragment_return reason=sim_inactive
+2026-04-02 10:36:59 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097419.241
+2026-04-02 10:36:59 INFO fragment_return reason=sim_inactive
+2026-04-02 10:37:01 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097421.239
+2026-04-02 10:37:01 INFO fragment_return reason=sim_inactive
+2026-04-02 10:37:02 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097422.244
+2026-04-02 10:37:02 INFO fragment_return reason=sim_inactive
+2026-04-02 10:37:03 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097423.238
+2026-04-02 10:37:03 INFO fragment_return reason=sim_inactive
+2026-04-02 10:37:04 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097424.244
+2026-04-02 10:37:04 INFO fragment_return reason=sim_inactive
+2026-04-02 10:37:05 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097425.249
+2026-04-02 10:37:05 INFO fragment_return reason=sim_inactive
+2026-04-02 10:37:07 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097427.247
+2026-04-02 10:37:07 INFO fragment_return reason=sim_inactive
+2026-04-02 10:37:08 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097428.241
+2026-04-02 10:37:08 INFO fragment_return reason=sim_inactive
+2026-04-02 10:37:09 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097429.243
+2026-04-02 10:37:09 INFO fragment_return reason=sim_inactive
+2026-04-02 10:37:10 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097430.239
+2026-04-02 10:37:10 INFO fragment_return reason=sim_inactive
+2026-04-02 10:37:11 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097431.244
+2026-04-02 10:37:11 INFO fragment_return reason=sim_inactive
+2026-04-02 10:37:13 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097433.243
+2026-04-02 10:37:13 INFO fragment_return reason=sim_inactive
+2026-04-02 10:37:14 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097434.250
+2026-04-02 10:37:14 INFO fragment_return reason=sim_inactive
+2026-04-02 10:37:15 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097435.245
+2026-04-02 10:37:15 INFO fragment_return reason=sim_inactive
+2026-04-02 10:37:16 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097436.251
+2026-04-02 10:37:16 INFO fragment_return reason=sim_inactive
+2026-04-02 10:37:17 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097437.243
+2026-04-02 10:37:17 INFO fragment_return reason=sim_inactive
+2026-04-02 10:37:19 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097439.236
+2026-04-02 10:37:19 INFO fragment_return reason=sim_inactive
+2026-04-02 10:37:20 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097440.245
+2026-04-02 10:37:20 INFO fragment_return reason=sim_inactive
+2026-04-02 10:37:21 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097441.237
+2026-04-02 10:37:21 INFO fragment_return reason=sim_inactive
+2026-04-02 10:37:22 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097442.241
+2026-04-02 10:37:22 INFO fragment_return reason=sim_inactive
+2026-04-02 10:37:29 INFO fragment_enter sim=False n_msg=1 pending=False next_ai=0.000 now=1775097449.247
+2026-04-02 10:37:29 INFO fragment_return reason=sim_inactive

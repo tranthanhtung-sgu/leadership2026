@@ -1,16 +1,13 @@
 import html
 import io
-import logging
 import os
 import random
-import sys
-import tempfile
 import time
 from datetime import datetime
-from logging.handlers import RotatingFileHandler
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from openai import OpenAI
 
 from character_configs import (
@@ -114,108 +111,6 @@ CHAT_SCROLL_HEIGHT_PX = 560
 # Stable widget id so chat_input is not recreated; must be processed before the timed fragment
 # (fragment may call st.rerun(), which would skip any code below it in the same run).
 PARTICIPANT_CHAT_KEY = "participant_chat_in"
-# Drop repeat submits of the same text within this many seconds (double-Enter / chatter).
-PARTICIPANT_SUBMIT_DEBOUNCE_SEC = 2.0
-
-# Set LEADERSHIP_CHAT_DEBUG=0 (or false/off) to disable.
-# (1) In-memory ring buffer in session_state — works on Streamlit Cloud.
-# (2) Rotating file under ./logs/ if writable, else under system temp (Cloud app dirs are often read-only).
-# For “Manage app → Logs”: LEADERSHIP_CHAT_DEBUG_STDERR=1 mirrors lines to stderr.
-_CHAT_DEBUG_DIR_APP = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
-_CHAT_DEBUG_DIR_TMP = os.path.join(tempfile.gettempdir(), "leadership_streamlit_chat")
-_CHAT_DEBUG_LOGGER = logging.getLogger("leadership_chat_debug")
-_CHAT_DEBUG_FILE_EFFECTIVE: str | None = None
-
-CHAT_DEBUG_BUFFER_KEY = "_chat_debug_ring"
-CHAT_DEBUG_BUFFER_MAX = 5000
-
-
-def _chat_debug_buffer_append(line: str) -> None:
-    try:
-        buf: list[str] = st.session_state.setdefault(CHAT_DEBUG_BUFFER_KEY, [])
-    except Exception:
-        return
-    buf.append(line)
-    over = len(buf) - CHAT_DEBUG_BUFFER_MAX
-    if over > 0:
-        del buf[:over]
-
-
-def _chat_debug_log(fmt: str, *args: object) -> None:
-    global _CHAT_DEBUG_FILE_EFFECTIVE
-    v = os.environ.get("LEADERSHIP_CHAT_DEBUG", "1").strip().lower()
-    if v in {"0", "false", "no", "off"}:
-        return
-    try:
-        body = fmt % args if args else fmt
-    except (TypeError, ValueError):
-        body = f"{fmt!s} | {args!r}"
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    _chat_debug_buffer_append(f"{ts} INFO {body}")
-
-    if not _CHAT_DEBUG_LOGGER.handlers:
-        _CHAT_DEBUG_LOGGER.setLevel(logging.INFO)
-        formatter = logging.Formatter(
-            "%(asctime)s %(levelname)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-        )
-        for fp in (
-            os.path.join(_CHAT_DEBUG_DIR_APP, "chat_debug.log"),
-            os.path.join(_CHAT_DEBUG_DIR_TMP, "chat_debug.log"),
-        ):
-            try:
-                os.makedirs(os.path.dirname(fp), exist_ok=True)
-                h = RotatingFileHandler(
-                    fp,
-                    maxBytes=1_500_000,
-                    backupCount=3,
-                    encoding="utf-8",
-                )
-                h.setFormatter(formatter)
-                _CHAT_DEBUG_LOGGER.addHandler(h)
-                _CHAT_DEBUG_FILE_EFFECTIVE = os.path.abspath(fp)
-                break
-            except OSError:
-                continue
-        se = os.environ.get("LEADERSHIP_CHAT_DEBUG_STDERR", "0").strip().lower()
-        if se in {"1", "true", "yes", "on"}:
-            sh = logging.StreamHandler(sys.stderr)
-            sh.setFormatter(formatter)
-            _CHAT_DEBUG_LOGGER.addHandler(sh)
-        if not _CHAT_DEBUG_LOGGER.handlers:
-            _CHAT_DEBUG_LOGGER.addHandler(logging.NullHandler())
-        _CHAT_DEBUG_LOGGER.propagate = False
-    _CHAT_DEBUG_LOGGER.info(fmt, *args)
-
-
-def _bundle_chat_debug_logs_for_download() -> str:
-    """On-disk logs (if any) plus in-memory ring buffer for this browser session."""
-    chunks: list[str] = []
-    base = _CHAT_DEBUG_FILE_EFFECTIVE
-    if not base:
-        candidates = (
-            os.path.join(_CHAT_DEBUG_DIR_APP, "chat_debug.log"),
-            os.path.join(_CHAT_DEBUG_DIR_TMP, "chat_debug.log"),
-        )
-        base = next((p for p in candidates if os.path.isfile(p)), None)
-    if base:
-        for path in [base] + [f"{base}.{i}" for i in range(1, 5)]:
-            if not os.path.isfile(path):
-                continue
-            try:
-                with open(path, "r", encoding="utf-8", errors="replace") as f:
-                    chunks.append(f"===== {os.path.basename(path)} (file) =====\n{f.read()}")
-            except OSError:
-                chunks.append(f"===== {os.path.basename(path)} =====\n(read error)\n")
-    try:
-        buf: list[str] = list(st.session_state.get(CHAT_DEBUG_BUFFER_KEY) or [])
-    except Exception:
-        buf = []
-    if buf:
-        chunks.append(
-            "===== session buffer (this tab; works on Streamlit Cloud) =====\n"
-            + "\n".join(buf)
-        )
-    return "\n\n".join(chunks) if chunks else ""
 
 # WhatsApp-Web–style peer row: pastel avatar, coloured display name
 _SPEAKER_CHAT_STYLE: dict[str, dict[str, str]] = {
@@ -224,17 +119,6 @@ _SPEAKER_CHAT_STYLE: dict[str, dict[str, str]] = {
     "Hao": {"avatar_bg": "#d8f5e3", "avatar_fg": "#075e54", "name": "#128c7e"},
 }
 _DEFAULT_PEER_STYLE = {"avatar_bg": "#e1e8e4", "avatar_fg": "#54656f", "name": "#54656f"}
-
-
-def _embed_chat_iframe(html_doc: str, height_px: int) -> None:
-    """Embed full HTML chat doc. Prefer ``st.iframe`` (Streamlit ≥ ~1.30); fall back to ``components.html``."""
-    iframe_fn = getattr(st, "iframe", None)
-    if callable(iframe_fn):
-        iframe_fn(html_doc, height=height_px, width="stretch")
-        return
-    import streamlit.components.v1 as components
-
-    components.html(html_doc, height=height_px, scrolling=False)
 
 
 def _team_chat_message_html(
@@ -740,16 +624,13 @@ if col_stop.button("⏸ STOP"):
     st.session_state.sim_active = False
     st.session_state.next_ai_time = 0.0
     st.session_state.ai_burst_remaining = 0
-    st.session_state.pending_bot_turn = None
     st.rerun()
 if col_reset.button("⏹ RESET"):
     st.session_state.sim_active = False
     st.session_state.messages = []
     st.session_state.next_ai_time = 0.0
     st.session_state.ai_burst_remaining = 0
-    st.session_state.pending_bot_turn = None
     st.session_state.api_count = 0
-    st.session_state.pop("_last_participant_submit", None)
     st.session_state.bot_turns_since_human = 0
     st.session_state.last_contribution_nudge_at_ai_count = -10_000
     st.rerun()
@@ -807,9 +688,6 @@ _sim_status = "**Running**" if st.session_state.sim_active else "**Stopped** (AI
 st.info(
     f"Condition: **{leadership_style}** | Participant: **{participant_id}** | Sim: {_sim_status}"
 )
-st.caption(
-    "Chat: use **Enter** or the send arrow to submit. Very quick double-Enter may count as one send."
-)
 
 st.markdown(
     _team_chat_css()
@@ -846,37 +724,10 @@ div[data-testid="stChatInputContainer"] textarea {
 
 # Participant composer: run before chat_messages_panel(). Streamlit still pins chat_input to the
 # bottom of the page; processing here ensures submits are not skipped when the fragment calls st.rerun().
-if prompt := st.chat_input(
-    "Type a message",
-    key=PARTICIPANT_CHAT_KEY,
-):
-    _pt = (prompt or "").strip()
-    if not _pt:
-        st.rerun()
-    _now_m = time.monotonic()
-    _prev = st.session_state.get("_last_participant_submit")
-    if (
-        _prev is not None
-        and _prev[0] == _pt
-        and (_now_m - float(_prev[1])) < PARTICIPANT_SUBMIT_DEBOUNCE_SEC
-    ):
-        _chat_debug_log(
-            "participant_submit_ignored_duplicate preview=%r delta_s=%.3f",
-            (_pt[:160] + "…") if len(_pt) > 160 else _pt,
-            _now_m - float(_prev[1]),
-        )
-        st.rerun()
-    st.session_state._last_participant_submit = (_pt, float(_now_m))
-    _pre = len(st.session_state.messages)
-    _chat_debug_log(
-        "participant_submit len=%s msgs_before=%s preview=%r",
-        len(_pt),
-        _pre,
-        (_pt[:160] + "…") if len(_pt) > 160 else _pt,
-    )
+if prompt := st.chat_input("Type a message", key=PARTICIPANT_CHAT_KEY):
     st.session_state.messages.append({
         "speaker": "Participant",
-        "text": _pt,
+        "text": prompt,
         "timestamp": datetime.now().strftime("%H:%M:%S"),
     })
     st.session_state.bot_turns_since_human = 0
@@ -885,10 +736,6 @@ if prompt := st.chat_input(
     if st.session_state.sim_active:
         st.session_state.next_ai_time = time.time() + random.uniform(*HUMAN_REPLY_DELAY_RANGE)
         st.session_state.ai_burst_remaining = random.randint(3, 5)
-    _chat_debug_log(
-        "participant_appended msgs_after=%s rerun=app",
-        len(st.session_state.messages),
-    )
     st.rerun()
 
 # ==========================================
@@ -896,27 +743,20 @@ if prompt := st.chat_input(
 # ==========================================
 @st.fragment(run_every=FRAGMENT_REFRESH_SEC)
 def chat_messages_panel():
-    _chat_debug_log(
-        "fragment_enter sim=%s n_msg=%s pending=%s next_ai=%.3f now=%.3f",
-        st.session_state.sim_active,
-        len(st.session_state.messages),
-        st.session_state.get("pending_bot_turn") is not None,
-        float(st.session_state.get("next_ai_time", 0.0)),
-        time.time(),
-    )
     feed_h = max(120, CHAT_SCROLL_HEIGHT_PX - 72)
     _force_scroll = bool(st.session_state.get("force_scroll_to_bottom_once", False))
     if _force_scroll:
         st.session_state.force_scroll_to_bottom_once = False
 
-    _embed_chat_iframe(
+    components.html(
         _team_chat_iframe_doc(
             st.session_state.messages,
             participant_id,
             feed_h,
             force_scroll_to_bottom=_force_scroll,
         ),
-        CHAT_SCROLL_HEIGHT_PX + 4,
+        height=CHAT_SCROLL_HEIGHT_PX + 4,
+        scrolling=False,
     )
 
     if not st.session_state.sim_active and not st.session_state.messages:
@@ -925,10 +765,6 @@ def chat_messages_panel():
         st.caption("Simulation **stopped** — transcript above. Click ▶ START to resume AI.")
 
     if not st.session_state.sim_active:
-        if st.session_state.get("pending_bot_turn") is not None:
-            st.session_state.pending_bot_turn = None
-            _chat_debug_log("fragment_clear_pending reason=sim_inactive")
-        _chat_debug_log("fragment_return reason=sim_inactive")
         return
 
     now = time.time()
@@ -947,25 +783,13 @@ def chat_messages_panel():
             st.caption(f"{speaker} is typing…")
 
         if now < ready_at:
-            _chat_debug_log(
-                "fragment_return reason=pending_typing_wait speaker=%s ready_at=%.3f",
-                speaker,
-                ready_at,
-            )
             return
 
         ok = run_agent_turn(speaker, extra_instruction=extra_instruction)
         st.session_state.pending_bot_turn = None
         if not ok:
             st.session_state.next_ai_time = time.time() + 4.0
-            _chat_debug_log("fragment_return reason=agent_failed speaker=%s", speaker)
             return
-
-        _chat_debug_log(
-            "fragment_bot_posted speaker=%s n_msg=%s",
-            speaker,
-            len(st.session_state.messages),
-        )
 
         if used_contribution_nudge:
             st.session_state.last_contribution_nudge_at_ai_count = sum(
@@ -990,7 +814,6 @@ def chat_messages_panel():
             st.session_state.next_ai_time = time.time() + random.uniform(idle_lo, idle_hi)
             st.session_state.ai_burst_remaining = random.randint(1, 3)
 
-        _chat_debug_log("fragment_rerun reason=after_bot_post")
         st.rerun()
 
     if now >= st.session_state.next_ai_time:
@@ -1064,42 +887,15 @@ def chat_messages_panel():
         lo, hi = parse_typing_delay(str(td_raw), cfg.typing_delay)
         type_sec = random.uniform(lo, hi)
 
-        _ready_at = time.time() + think_sec + type_sec
         st.session_state.pending_bot_turn = {
             "speaker": speaker,
             "extra_instruction": extra_instruction,
             "used_contribution_nudge": used_contribution_nudge,
-            "ready_at": _ready_at,
+            "ready_at": time.time() + think_sec + type_sec,
         }
         # Keep fragment alive; next run will post when ready_at has passed.
         st.session_state.next_ai_time = time.time() + 0.05
-        _chat_debug_log(
-            "fragment_schedule_pending speaker=%s delay_s=%.3f ready_at=%.3f rerun=app",
-            speaker,
-            think_sec + type_sec,
-            _ready_at,
-        )
         st.rerun()
 
 
 chat_messages_panel()
-
-with st.expander("🐞 Debug log (download)", expanded=False):
-    st.caption(
-        "Telemetry is kept in this browser session (ring buffer) and, when possible, under "
-        "`logs/` or the system temp folder. Set `LEADERSHIP_CHAT_DEBUG=0` to disable. "
-        "Remove this expander when you no longer need it."
-    )
-    _log_bundle = _bundle_chat_debug_logs_for_download()
-    st.download_button(
-        "Download debug log",
-        data=_log_bundle.encode("utf-8"),
-        file_name=f"chat_debug_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-        mime="text/plain; charset=utf-8",
-        disabled=not _log_bundle,
-        key="download_chat_debug_log",
-    )
-    if not _log_bundle:
-        st.caption(
-            "No entries yet — use the chat (one fragment tick), then open this expander again."
-        )
