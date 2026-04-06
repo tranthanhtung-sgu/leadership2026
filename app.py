@@ -87,6 +87,27 @@ PARTICIPANT_INVITE_EXTRA = (
 )
 
 
+def _get_chat_message_limit() -> int:
+    try:
+        v = st.session_state.get("max_chat_messages", DEFAULT_MAX_CHAT_MESSAGES)
+        return max(1, int(v))
+    except (TypeError, ValueError):
+        return DEFAULT_MAX_CHAT_MESSAGES
+
+
+def _stop_simulation_for_message_limit() -> None:
+    """Pause AI and clear pending bot work (transcript is kept)."""
+    st.session_state.sim_active = False
+    st.session_state.pending_bot_turn = None
+    st.session_state.next_ai_time = 0.0
+    st.session_state.ai_burst_remaining = 0
+    st.session_state.sim_stopped_by_message_cap = True
+
+
+def _transcript_at_or_over_limit() -> bool:
+    return len(st.session_state.messages) >= _get_chat_message_limit()
+
+
 def _participant_invite_due(bot_turns: int, first: int, every: int) -> bool:
     """True on first at `first`, then every `every` additional AI-only turns (e.g. 5, 12, 19, …)."""
     if bot_turns < first:
@@ -107,6 +128,9 @@ POST_HUMAN_BOT_WINDOW = 5
 
 # Scroll this area only; keeps the participant chat box from being pushed off-screen.
 CHAT_SCROLL_HEIGHT_PX = 560
+
+# Auto-stop simulation when transcript reaches this many lines (configurable in sidebar).
+DEFAULT_MAX_CHAT_MESSAGES = 100
 
 # Stable widget id so chat_input is not recreated; must be processed before the timed fragment
 # (fragment may call st.rerun(), which would skip any code below it in the same run).
@@ -543,6 +567,8 @@ if "pending_bot_turn" not in st.session_state:
     st.session_state.pending_bot_turn = None
 if "force_scroll_to_bottom_once" not in st.session_state:
     st.session_state.force_scroll_to_bottom_once = False
+if "sim_stopped_by_message_cap" not in st.session_state:
+    st.session_state.sim_stopped_by_message_cap = False
 
 for _name in AI_NAMES:
     _wk = f"tune_w_{_name}"
@@ -581,6 +607,21 @@ leadership_style = st.sidebar.select_slider(
     options=["Non-Inclusive", "Inclusive"]
 )
 
+with st.sidebar.expander("⏱️ Session safety (API)", expanded=True):
+    st.number_input(
+        "Max chat messages before auto-stop",
+        min_value=20,
+        max_value=5000,
+        value=DEFAULT_MAX_CHAT_MESSAGES,
+        step=10,
+        key="max_chat_messages",
+        help=(
+            "When the transcript reaches this many lines, the simulation stops automatically "
+            "so a forgotten test tab does not keep calling the API. RESET clears the chat; "
+            "you can raise this if you need a longer session."
+        ),
+    )
+
 with st.sidebar.expander("🎛️ Character pacing (live)", expanded=True):
     st.caption(
         "Weights: baseline chance each teammate speaks. "
@@ -616,14 +657,22 @@ st.sidebar.caption(
 )
 col_run, col_stop, col_reset = st.sidebar.columns(3)
 if col_run.button("▶ START"):
-    st.session_state.sim_active = True
-    st.session_state.next_ai_time = time.time() + START_WARMUP_SEC
-    st.session_state.ai_burst_remaining = random.randint(2, 3)
+    if _transcript_at_or_over_limit():
+        st.sidebar.error(
+            "Cannot START: transcript is already at or above the max message limit. "
+            "Use RESET or raise “Max chat messages” in Session safety."
+        )
+    else:
+        st.session_state.sim_active = True
+        st.session_state.sim_stopped_by_message_cap = False
+        st.session_state.next_ai_time = time.time() + START_WARMUP_SEC
+        st.session_state.ai_burst_remaining = random.randint(2, 3)
     st.rerun()
 if col_stop.button("⏸ STOP"):
     st.session_state.sim_active = False
     st.session_state.next_ai_time = 0.0
     st.session_state.ai_burst_remaining = 0
+    st.session_state.sim_stopped_by_message_cap = False
     st.rerun()
 if col_reset.button("⏹ RESET"):
     st.session_state.sim_active = False
@@ -633,6 +682,7 @@ if col_reset.button("⏹ RESET"):
     st.session_state.api_count = 0
     st.session_state.bot_turns_since_human = 0
     st.session_state.last_contribution_nudge_at_ai_count = -10_000
+    st.session_state.sim_stopped_by_message_cap = False
     st.rerun()
 
 if st.sidebar.button("💾 EXPORT TRANSCRIPT"):
@@ -685,9 +735,17 @@ def run_agent_turn(speaker: str, extra_instruction: str | None = None) -> bool:
 # 6. MAIN UI - INFO BAR
 # ==========================================
 _sim_status = "**Running**" if st.session_state.sim_active else "**Stopped** (AI off; transcript kept)"
+_msg_n = len(st.session_state.messages)
+_msg_lim = _get_chat_message_limit()
 st.info(
-    f"Condition: **{leadership_style}** | Participant: **{participant_id}** | Sim: {_sim_status}"
+    f"Condition: **{leadership_style}** | Participant: **{participant_id}** | Sim: {_sim_status} "
+    f"| Messages: **{_msg_n}** / **{_msg_lim}**"
 )
+if st.session_state.get("sim_stopped_by_message_cap") and _transcript_at_or_over_limit():
+    st.warning(
+        f"Simulation auto-stopped: transcript reached **{_msg_lim}** messages (API safety). "
+        "Raise **Max chat messages** under **Session safety (API)**, or **RESET** to clear the chat."
+    )
 
 st.markdown(
     _team_chat_css()
@@ -733,7 +791,9 @@ if prompt := st.chat_input("Type a message", key=PARTICIPANT_CHAT_KEY):
     st.session_state.bot_turns_since_human = 0
     st.session_state.pending_bot_turn = None
     st.session_state.force_scroll_to_bottom_once = True
-    if st.session_state.sim_active:
+    if _transcript_at_or_over_limit():
+        _stop_simulation_for_message_limit()
+    elif st.session_state.sim_active:
         st.session_state.next_ai_time = time.time() + random.uniform(*HUMAN_REPLY_DELAY_RANGE)
         st.session_state.ai_burst_remaining = random.randint(3, 5)
     st.rerun()
@@ -764,6 +824,10 @@ def chat_messages_panel():
     elif not st.session_state.sim_active and st.session_state.messages:
         st.caption("Simulation **stopped** — transcript above. Click ▶ START to resume AI.")
 
+    if _transcript_at_or_over_limit() and st.session_state.sim_active:
+        _stop_simulation_for_message_limit()
+        st.rerun()
+
     if not st.session_state.sim_active:
         return
 
@@ -791,6 +855,10 @@ def chat_messages_panel():
             st.session_state.next_ai_time = time.time() + 4.0
             return
 
+        if _transcript_at_or_over_limit():
+            _stop_simulation_for_message_limit()
+            st.rerun()
+
         if used_contribution_nudge:
             st.session_state.last_contribution_nudge_at_ai_count = sum(
                 1 for m in st.session_state.messages if m.get("speaker") in AI_NAMES
@@ -817,6 +885,10 @@ def chat_messages_panel():
         st.rerun()
 
     if now >= st.session_state.next_ai_time:
+        if _transcript_at_or_over_limit():
+            _stop_simulation_for_message_limit()
+            st.rerun()
+
         if not st.session_state.messages:
             last_speaker, last_text = "Participant", ""
         else:
