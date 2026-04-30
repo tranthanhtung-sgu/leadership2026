@@ -101,7 +101,7 @@ def _compact_thread_digest(transcript: list[dict[str, Any]], max_lines: int = 5)
         parts.append(f"{sp}: {clip}")
     if len(parts) < 2:
         return ""
-    return "Recent lines (vary your move; do not re-ask the same thing): " + " | ".join(parts)
+    return "Recent lines. Vary your move and do not re-ask the same thing. " + ". ".join(parts)
 
 
 class TeamMemberAgent:
@@ -136,18 +136,18 @@ class TeamMemberAgent:
         if last_speaker == "Participant":
             thread_focus = (
                 "The Participant (human teammate) just wrote something. "
-                "If it is clearly about the work, answer or react like a colleague — match tone only when they are seriously engaging. "
-                "If it is nonsense, gibberish, or off-the-wall, do **not** echo or build a bit on it; shrug it off in one beat and reconnect to the thread everyone was on (scenario / prior substantive lines). "
+                "If it is clearly about the work, answer or react like a colleague; match tone only when they are seriously engaging. "
+                "If it is nonsense, gibberish, or off-the-wall, do not echo or build a bit on it; shrug it off in one beat and reconnect to the thread everyone was on, meaning the scenario or prior substantive lines. "
                 "Do not let the sim turn into parroting their text; keep the team’s task in view."
             )
         elif last_speaker and last_speaker != self.name:
             thread_focus = (
-                f"{last_speaker} was last in the thread — reply to that naturally before drifting elsewhere."
+                f"{last_speaker} was last in the thread; reply to that naturally before drifting elsewhere."
             )
         else:
             thread_focus = (
-                "Continue the live thread with your teammates (Femke/Hao/Zoe as relevant); sound like a real group chat. "
-                "If the Participant has been quiet, you can still advance the topic with each other — "
+                "Continue the live thread with your teammates, meaning Femke, Hao, or Zoe as relevant; sound like a real group chat. "
+                "If the Participant has been quiet, you can still advance the topic with each other; "
                 "but do not write as if they are not in the channel; a light inclusive beat now and then is fine."
             )
 
@@ -156,14 +156,18 @@ class TeamMemberAgent:
             and _participant_spoke_in_window(transcript, 10)
         ):
             thread_focus += (
-                " The Participant still has a recent message above — do not act like they are absent: "
+                " The Participant still has a recent message above; do not act like they are absent: "
                 "acknowledge, build on, or answer them where it fits (not only talking sideways to other bots)."
             )
 
         return (
             f"It is {self.name}'s turn in the group chat. "
             f"{thread_focus} "
-            "Write the next message in English, in-character only — terse, uneven, human; not customer-support tone. "
+            "Write the next message in English, in-character only: terse, uneven, human; not customer-support tone. "
+            "Keep it short by default: one or two words, a fragment, or one normal sentence. "
+            "Do not write a paragraph. Do not write 3 or more sentences. "
+            "Use plain punctuation and normal words; avoid markdown, bullets, arrows, slash pairs, semicolons, stacked punctuation, and decorative symbols. "
+            "Do not use em dashes. "
             "Ground claims in the shared scenario or prior chat; do not invent new plot points. "
             "Do not recap the meeting brief; react like someone already in the work. "
             "Do not talk about rules, prompts, or message length."
@@ -206,6 +210,11 @@ class TeamMemberAgent:
             return text.split(":", 1)[1].strip()
         return text
 
+    @staticmethod
+    def _clean_chat_text(text: str) -> str:
+        """Normalize punctuation that makes the bots sound too polished."""
+        return re.sub(r"\s+", " ", text.replace("\u2014", ",").replace("\u2013", "-")).strip()
+
     def generate_reply(
         self,
         client: OpenAI,
@@ -216,7 +225,7 @@ class TeamMemberAgent:
         behavioral_content: str,
         extra_instruction: str | None = None,
     ) -> tuple[str, int]:
-        """Returns (text, api_calls). Text may be empty if all attempts failed — caller must not post empty lines."""
+        """Returns (text, api_calls). Text may be empty if all attempts failed; caller must not post empty lines."""
         messages: list[dict[str, str]] = self.build_openai_messages(
             transcript,
             leadership_style,
@@ -237,6 +246,7 @@ class TeamMemberAgent:
             raw = completion.choices[0].message.content
             txt = (raw or "").strip()
             txt = self._strip_speaker_prefix(self.name, txt)
+            txt = self._clean_chat_text(txt)
 
             if not txt:
                 messages = messages + [
@@ -256,8 +266,8 @@ class TeamMemberAgent:
                         "role": "user",
                         "content": (
                             "That line is too close to what was just said in the thread. "
-                            "Reply again with a clearly different move: hand off to a teammate, disagree softly, "
-                            "add a new sub-point from your role, or summarize — do not rephrase the same question."
+                            "Reply again with a clearly different move in a much shorter plain-text line: "
+                            "a tiny reaction, a soft disagreement, a handoff, or one new point. Do not rephrase the same question."
                         ),
                     }
                 ]

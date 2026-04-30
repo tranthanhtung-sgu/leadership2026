@@ -67,23 +67,57 @@ if "OPENAI_KEY" not in st.secrets:
 client = OpenAI(api_key=st.secrets["OPENAI_KEY"])
 MODEL_NAME = "gpt-5.2"
 
-# Timing tuned for snappier chat (seconds)
+# Timing tuned for a realistic group chat pace (seconds)
 FRAGMENT_REFRESH_SEC = 1.2
-START_WARMUP_SEC = 0.8
+START_WARMUP_SEC = 1.8
 # Longer pause after the human sends so they can read before bots pile on
-# Keep this small so bots continue quickly after a human sends.
-HUMAN_REPLY_DELAY_RANGE = (3, 6)
-IDLE_AFTER_BURST_RANGE = (5.0, 9.0)
+# Keep this modest so bots continue after a human sends, but not instantly.
+HUMAN_REPLY_DELAY_RANGE = (5, 9)
+IDLE_AFTER_BURST_RANGE = (8.0, 14.0)
 # Extra idle after a burst if the Participant spoke recently (reading / jump-in window)
-PARTICIPANT_RECENT_IDLE_RANGE = (16.0, 32.0)
+PARTICIPANT_RECENT_IDLE_RANGE = (22.0, 40.0)
 # After this many consecutive AI lines without the Participant, Zoe gets a soft “human in the room” nudge.
 # Repeats every PARTICIPANT_INVITE_REPEAT_EVERY further AI turns so a silent Participant isn’t dropped after the opening.
 PARTICIPANT_INVITE_FIRST_BOT_TURNS = 5
 PARTICIPANT_INVITE_REPEAT_EVERY = 7
 PARTICIPANT_INVITE_EXTRA = (
-    "(Facilitator nudge: the human teammate is in this chat but has been quiet — "
+    "(Facilitator nudge: the human teammate is in this chat but has been quiet; "
     "one short, natural line that leaves them room to jump in or reacts to the thread without demanding an answer; "
     "do not re-ask the same question or A/B you already used; you can mostly talk to teammates but nod to them.)"
+)
+
+SESSION_DURATION_SEC = 15 * 60
+TIME_REMINDER_SCHEDULE: tuple[tuple[int, int, str], ...] = (
+    (
+        5,
+        SESSION_DURATION_SEC - 5 * 60,
+        "(Time check: about 5 minutes left. As Zoe, one short chat line nudging the group to converge on the VC answers.)",
+    ),
+    (
+        3,
+        SESSION_DURATION_SEC - 3 * 60,
+        "(Time check: about 3 minutes left. As Zoe, one short practical line asking the team to lock the strongest points.)",
+    ),
+    (
+        1,
+        SESSION_DURATION_SEC - 1 * 60,
+        "(Time check: about 1 minute left. As Zoe, one brief finalization prompt, no recap essay.)",
+    ),
+)
+
+INTRO_SEQUENCE: tuple[tuple[str, str], ...] = (
+    (
+        "Zoe",
+        "(Opening intro round: briefly introduce yourself as Zoe, the team lead. Mention CortiSense and your R and D specs knowledge in one short natural line. Use plain text.)",
+    ),
+    (
+        "Femke",
+        "(Opening intro round: briefly introduce yourself as Femke from Rotterdam. Mention EU manufacturing and MediTech in one short natural line, not a fixed script. Use plain text.)",
+    ),
+    (
+        "Hao",
+        "(Opening intro round: briefly introduce yourself as Hao. Mention Asian markets and distributor knowledge in one short natural line. Keep it hesitant and plain.)",
+    ),
 )
 
 
@@ -106,6 +140,35 @@ def _stop_simulation_for_message_limit() -> None:
 
 def _transcript_at_or_over_limit() -> bool:
     return len(st.session_state.messages) >= _get_chat_message_limit()
+
+
+def _next_intro_turn() -> tuple[int, str, str] | None:
+    """Return the next generated intro turn while the opening round is incomplete."""
+    try:
+        idx = int(st.session_state.get("intro_next_idx", len(INTRO_SEQUENCE)))
+    except (TypeError, ValueError):
+        idx = len(INTRO_SEQUENCE)
+    if 0 <= idx < len(INTRO_SEQUENCE):
+        speaker, instruction = INTRO_SEQUENCE[idx]
+        return idx, speaker, instruction
+    return None
+
+
+def _due_time_reminder(now: float) -> tuple[int, str] | None:
+    """Return the next unfired reminder instruction once its elapsed-time mark passes."""
+    started_at = st.session_state.get("session_started_at")
+    if not started_at:
+        return None
+    try:
+        elapsed = now - float(started_at)
+    except (TypeError, ValueError):
+        return None
+
+    sent = set(st.session_state.get("time_reminders_sent", []))
+    for minutes_left, elapsed_at, instruction in TIME_REMINDER_SCHEDULE:
+        if minutes_left not in sent and elapsed >= elapsed_at:
+            return minutes_left, instruction
+    return None
 
 
 def _participant_invite_due(bot_turns: int, first: int, every: int) -> bool:
@@ -569,6 +632,12 @@ if "force_scroll_to_bottom_once" not in st.session_state:
     st.session_state.force_scroll_to_bottom_once = False
 if "sim_stopped_by_message_cap" not in st.session_state:
     st.session_state.sim_stopped_by_message_cap = False
+if "session_started_at" not in st.session_state:
+    st.session_state.session_started_at = None
+if "time_reminders_sent" not in st.session_state:
+    st.session_state.time_reminders_sent = []
+if "intro_next_idx" not in st.session_state:
+    st.session_state.intro_next_idx = len(INTRO_SEQUENCE)
 
 for _name in AI_NAMES:
     _wk = f"tune_w_{_name}"
@@ -630,19 +699,19 @@ with st.sidebar.expander("🎛️ Character pacing (live)", expanded=True):
     )
     for _n in AI_NAMES:
         st.slider(
-            f"{_n} — speak weight",
+            f"{_n} - speak weight",
             min_value=0.05,
             max_value=1.5,
             step=0.05,
             key=f"tune_w_{_n}",
         )
         st.text_input(
-            f"{_n} — typing delay (min,max sec)",
+            f"{_n} - typing delay (min,max sec)",
             key=f"tune_td_{_n}",
             help="Example: 0.15,0.45",
         )
         st.text_input(
-            f"{_n} — think delay before typing (min,max sec)",
+            f"{_n} - think delay before typing (min,max sec)",
             key=f"tune_think_{_n}",
             help="Pause after the last message before this teammate starts typing.",
         )
@@ -663,6 +732,13 @@ if col_run.button("▶ START"):
             "Use RESET or raise “Max chat messages” in Session safety."
         )
     else:
+        fresh_session = not st.session_state.messages
+        if fresh_session:
+            st.session_state.bot_turns_since_human = 0
+            st.session_state.time_reminders_sent = []
+            st.session_state.intro_next_idx = 0
+        if fresh_session or not st.session_state.get("session_started_at"):
+            st.session_state.session_started_at = time.time()
         st.session_state.sim_active = True
         st.session_state.sim_stopped_by_message_cap = False
         st.session_state.next_ai_time = time.time() + START_WARMUP_SEC
@@ -683,6 +759,9 @@ if col_reset.button("⏹ RESET"):
     st.session_state.bot_turns_since_human = 0
     st.session_state.last_contribution_nudge_at_ai_count = -10_000
     st.session_state.sim_stopped_by_message_cap = False
+    st.session_state.session_started_at = None
+    st.session_state.time_reminders_sent = []
+    st.session_state.intro_next_idx = len(INTRO_SEQUENCE)
     st.rerun()
 
 if st.sidebar.button("💾 EXPORT TRANSCRIPT"):
@@ -822,7 +901,7 @@ def chat_messages_panel():
     if not st.session_state.sim_active and not st.session_state.messages:
         st.caption("Simulation not started. Use ▶ START in the sidebar.")
     elif not st.session_state.sim_active and st.session_state.messages:
-        st.caption("Simulation **stopped** — transcript above. Click ▶ START to resume AI.")
+        st.caption("Simulation **stopped** - transcript above. Click ▶ START to resume AI.")
 
     if _transcript_at_or_over_limit() and st.session_state.sim_active:
         _stop_simulation_for_message_limit()
@@ -842,6 +921,7 @@ def chat_messages_panel():
         speaker = str(pending.get("speaker") or "")
         extra_instruction = pending.get("extra_instruction")
         used_contribution_nudge = bool(pending.get("used_contribution_nudge", False))
+        intro_idx = pending.get("intro_idx")
 
         if speaker:
             st.caption(f"{speaker} is typing…")
@@ -863,6 +943,14 @@ def chat_messages_panel():
             st.session_state.last_contribution_nudge_at_ai_count = sum(
                 1 for m in st.session_state.messages if m.get("speaker") in AI_NAMES
             )
+
+        if intro_idx is not None:
+            try:
+                idx = int(intro_idx)
+            except (TypeError, ValueError):
+                idx = -1
+            if idx == int(st.session_state.get("intro_next_idx", -2)):
+                st.session_state.intro_next_idx = idx + 1
 
         cfg = CHARACTERS[speaker]
         st.session_state.bot_turns_since_human += 1
@@ -902,46 +990,61 @@ def chat_messages_panel():
             1 for m in st.session_state.messages if m.get("speaker") in AI_NAMES
         )
 
-        if last_speaker != "Participant" and _participant_invite_due(
-            st.session_state.bot_turns_since_human,
-            first=max(2, PARTICIPANT_INVITE_FIRST_BOT_TURNS),
-            every=max(3, PARTICIPANT_INVITE_REPEAT_EVERY),
-        ):
-            speaker = "Zoe"
-            cfg = CHARACTERS["Zoe"]
-            extra_instruction = PARTICIPANT_INVITE_EXTRA
+        intro_turn = _next_intro_turn()
+        intro_idx = None
+        if intro_turn is not None:
+            intro_idx, speaker, extra_instruction = intro_turn
+            cfg = CHARACTERS[speaker]
         else:
-            nudge_plan = None
-            _roll = float(QUIET_DRAW_IN_ROLL)
-            if st.session_state.bot_turns_since_human < POST_HUMAN_BOT_WINDOW:
-                _roll = 0.0
-            if _roll > 0 and random.random() < _roll:
-                nudge_plan = plan_contribution_nudge(
-                    st.session_state.messages,
-                    weight_map,
-                    last_speaker=last_speaker,
-                    last_text=last_text,
-                    quiet_if_lines_below=QUIET_DRAW_IN_LINES_BELOW,
-                    count_window=QUIET_DRAW_IN_WINDOW,
-                    min_ai_messages=QUIET_DRAW_IN_MIN_AI,
-                    address_lookback=QUIET_DRAW_IN_ADDRESS_LOOKBACK,
-                    current_ai_total=current_ai_total,
-                    ai_count_at_last_nudge=int(
-                        st.session_state.last_contribution_nudge_at_ai_count
-                    ),
-                    cooldown_ai_messages=QUIET_DRAW_IN_COOLDOWN,
-                )
-            if nudge_plan is not None:
-                speaker, _target, extra_instruction = nudge_plan
-                cfg = CHARACTERS[speaker]
-                used_contribution_nudge = True
+            reminder = _due_time_reminder(now)
+            if reminder is not None:
+                minutes_left, extra_instruction = reminder
+                speaker = "Zoe"
+                cfg = CHARACTERS["Zoe"]
+                st.session_state.time_reminders_sent = [
+                    *st.session_state.get("time_reminders_sent", []),
+                    minutes_left,
+                ]
+            elif last_speaker != "Participant" and _participant_invite_due(
+                st.session_state.bot_turns_since_human,
+                first=max(2, PARTICIPANT_INVITE_FIRST_BOT_TURNS),
+                every=max(3, PARTICIPANT_INVITE_REPEAT_EVERY),
+            ):
+                speaker = "Zoe"
+                cfg = CHARACTERS["Zoe"]
+                extra_instruction = PARTICIPANT_INVITE_EXTRA
             else:
-                speaker, cfg = pick_next_speaker(
-                    last_speaker,
-                    last_text,
-                    weights_override=weight_map,
-                    recent_messages=st.session_state.messages,
-                )
+                nudge_plan = None
+                _roll = float(QUIET_DRAW_IN_ROLL)
+                if st.session_state.bot_turns_since_human < POST_HUMAN_BOT_WINDOW:
+                    _roll = 0.0
+                if _roll > 0 and random.random() < _roll:
+                    nudge_plan = plan_contribution_nudge(
+                        st.session_state.messages,
+                        weight_map,
+                        last_speaker=last_speaker,
+                        last_text=last_text,
+                        quiet_if_lines_below=QUIET_DRAW_IN_LINES_BELOW,
+                        count_window=QUIET_DRAW_IN_WINDOW,
+                        min_ai_messages=QUIET_DRAW_IN_MIN_AI,
+                        address_lookback=QUIET_DRAW_IN_ADDRESS_LOOKBACK,
+                        current_ai_total=current_ai_total,
+                        ai_count_at_last_nudge=int(
+                            st.session_state.last_contribution_nudge_at_ai_count
+                        ),
+                        cooldown_ai_messages=QUIET_DRAW_IN_COOLDOWN,
+                    )
+                if nudge_plan is not None:
+                    speaker, _target, extra_instruction = nudge_plan
+                    cfg = CHARACTERS[speaker]
+                    used_contribution_nudge = True
+                else:
+                    speaker, cfg = pick_next_speaker(
+                        last_speaker,
+                        last_text,
+                        weights_override=weight_map,
+                        recent_messages=st.session_state.messages,
+                    )
 
         # Schedule a non-blocking "typing" period; the actual API call happens later.
         _think_fallback = _cfg_think_delay(cfg)
@@ -963,6 +1066,7 @@ def chat_messages_panel():
             "speaker": speaker,
             "extra_instruction": extra_instruction,
             "used_contribution_nudge": used_contribution_nudge,
+            "intro_idx": intro_idx,
             "ready_at": time.time() + think_sec + type_sec,
         }
         # Keep fragment alive; next run will post when ready_at has passed.
